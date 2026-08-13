@@ -12,9 +12,15 @@ roadmap por fases.
 - **Stack**: Next.js 16 (App Router) + Supabase (Postgres/Auth/Storage) +
   Drizzle ORM + Tailwind v4, deploy en Vercel.
 - **Auth**: solo magic link (sin password). Un único usuario por ahora.
-- **Editor de bloques**: se evaluó y se eligió **Yoopta-Editor** (MIT,
-  sobre Slate.js, tema shadcn, exporta a Markdown/HTML) para Data Center y
-  Libreta. Todavía no está instalado — se suma en Fase 1.
+- **Editor de bloques**: **Yoopta-Editor** (MIT, sobre Slate.js, exporta a
+  Markdown/HTML), instalado en Fase 1. Componente reutilizable en
+  `src/components/block-editor.tsx`. Set de plugins deliberadamente chico
+  (paragraph, headings, lists, blockquote, code, link, divider, marks) —
+  image/table quedan afuera hasta wirear upload a Supabase Storage.
+  `@yoopta/ui` (toolbar flotante, menú `/`) NO está integrado todavía: son
+  componentes compuestos (Root/Content/Item, no drop-in), documentado como
+  pendiente en el README. No lo agregues sin avisar — es una pieza de UI
+  no trivial.
 - **PWA**: manifest básico ya armado (`src/app/manifest.ts`). Offline real
   (service worker) y push notifications quedan para más adelante, no son
   parte del scaffold inicial.
@@ -44,13 +50,45 @@ roadmap por fases.
 
 - `src/app/(app)/` — rutas protegidas por `proxy.ts`, con el layout del
   sidebar (Inicio, Data Center, Libreta, Finanzas, Foco).
+  - `data-center/` tiene su propio layout con tabs (Páginas/Tareas):
+    `data-center/page.tsx` (páginas), `data-center/paginas/[id]/` (editor),
+    `data-center/tareas/` (tablero por estado).
+  - `libreta/page.tsx` (lista + buscador por `?q=`), `libreta/[id]/`
+    (editor de nota con tags).
+  - `foco/page.tsx` usa `PomodoroTimer` (solo cliente, sin DB).
 - `src/app/login/` y `src/app/auth/callback/` — fuera del grupo `(app)`,
   sin sidebar.
 - `src/lib/supabase/` — clientes browser/server de Supabase.
-- `src/db/` — Drizzle: `schema.ts` (vacío a propósito, se llena por fase)
-  y `index.ts` (cliente de conexión).
+- `src/lib/auth.ts` — `requireUser()`, usado en TODAS las server actions
+  que tocan la base para scopear por `user_id`.
+- `src/lib/tags.ts` — `parseTags()` (helper puro, separado de
+  `libreta/actions.ts` porque un archivo `"use server"` solo puede exportar
+  funciones async).
+- `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages`, `notes`
+  en el schema `life_os`) y `index.ts` (cliente de conexión).
+  `src/db/migrations/0000_polite_thena.sql` todavía no se aplicó en
+  Supabase (ver README → Base de datos).
+- `src/components/block-editor.tsx` — wrapper de Yoopta.
+  `entity-editor.tsx` — título + editor + autosave debounced (800ms),
+  reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
+  `task-board.tsx` — tablero de tareas con estado optimista en cliente.
+  `pomodoro-timer.tsx` — timer con settings persistidos en localStorage.
+
+## Patrón de server actions (seguir en todo lo nuevo)
+
+Cada `actions.ts` empieza con `await requireUser()` y todas las queries
+filtran por `eq(tabla.userId, user.id)` explícitamente — la conexión de
+Drizzle es directa a Postgres (`DATABASE_URL`), NO pasa por PostgREST, así
+que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 ## Estado actual
 
-Fase 0 completa (scaffold). Próximo paso: Fase 1 (Data Center con páginas +
-tareas, Libreta, Pomodoro).
+Fase 1 completa: Data Center (páginas con editor de bloques + tareas tipo
+Asana), Libreta (notas con tags y buscador), Pomodoro configurable. Build y
+lint verificados; NO se pudo probar en runtime contra Supabase real desde
+el sandbox donde se armó (red bloqueada a `*.supabase.co`) — probar en
+local o Vercel antes de asumir que algo funciona end-to-end. La migración
+SQL de las tablas todavía no se corrió en Supabase (ver README).
+
+Próximo paso: Fase 2 (Finanzas + música/yoga embebidos), o pulir Fase 1
+(`@yoopta/ui`, plugin de imágenes) si el uso diario lo pide primero.
