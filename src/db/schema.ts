@@ -5,6 +5,7 @@ import {
   pgSchema,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -107,4 +108,111 @@ export const notes = lifeOs.table(
       .defaultNow(),
   },
   (table) => [index("notes_user_id_idx").on(table.userId)],
+);
+
+// --- Finanzas ---
+// Los montos se guardan en centavos (integer, con signo: positivo =
+// ingreso, negativo = gasto) para no arrastrar problemas de precisión de
+// punto flotante. Se asume una sola moneda por ahora (el campo currency es
+// solo para mostrar, no hay conversión).
+
+export const accountType = lifeOs.enum("account_type", [
+  "cash",
+  "bank",
+  "card",
+  "other",
+]);
+
+export const categoryKind = lifeOs.enum("category_kind", [
+  "income",
+  "expense",
+]);
+
+export const accounts = lifeOs.table(
+  "accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    type: accountType("type").notNull().default("bank"),
+    currency: text("currency").notNull().default("ARS"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("accounts_user_id_idx").on(table.userId)],
+);
+
+export const categories = lifeOs.table(
+  "categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: categoryKind("kind").notNull().default("expense"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("categories_user_id_idx").on(table.userId)],
+);
+
+export const transactions = lifeOs.table(
+  "transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    amountCents: integer("amount_cents").notNull(),
+    description: text("description"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("transactions_user_id_idx").on(table.userId),
+    index("transactions_account_id_idx").on(table.accountId),
+    index("transactions_occurred_at_idx").on(table.occurredAt),
+  ],
+);
+
+export const budgets = lifeOs.table(
+  "budgets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    // Formato "YYYY-MM", ej. "2026-08".
+    month: text("month").notNull(),
+    limitCents: integer("limit_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("budgets_user_id_idx").on(table.userId),
+    uniqueIndex("budgets_user_category_month_idx").on(
+      table.userId,
+      table.categoryId,
+      table.month,
+    ),
+  ],
 );

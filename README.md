@@ -13,8 +13,9 @@ personal / experimento, código abierto.
   PWA instalable para captura desde cualquier dispositivo.
 - **Finanzas**: cuentas, movimientos, categorías, presupuestos y dashboard
   de gasto.
-- **Foco**: timer Pomodoro + playlist de jazz (embed) + fondos de
-  yoga/concentración, combinables en una "sesión de foco".
+- **Foco**: timer Pomodoro configurable + fondos ambientales (presets de
+  color o tu propio embed de playlist/video), combinables en una "sesión de
+  foco".
 
 ## Stack
 
@@ -35,7 +36,9 @@ personal / experimento, código abierto.
 - **Fase 1 (hecho)**: Data Center (páginas con editor de bloques + tareas
   tipo Asana con proyectos y estados) + Libreta (notas con tags y buscador)
   + Pomodoro configurable.
-- **Fase 2**: Finanzas + música/yoga embebidos.
+- **Fase 2 (hecho)**: Finanzas (cuentas, categorías, movimientos,
+  presupuestos mensuales, resumen del mes) + Foco con fondos ambientales y
+  playlist/video personalizables.
 - **Fase 3**: integración con GitHub (crear PRs desde tareas), Google
   Calendar, generación de docs técnicas con IA (Claude API).
 - **Fase 4**: personalización (temas, layout de widgets), reportes.
@@ -69,13 +72,17 @@ nuevo.
 
 ## Base de datos
 
-Las tablas (`life_os.projects`, `tasks`, `pages`, `notes`) todavía no están
-creadas en Supabase — el schema vive en `src/db/schema.ts` pero falta
-aplicarlo. Dos formas de hacerlo:
+Las tablas (`life_os.projects`, `tasks`, `pages`, `notes`, `accounts`,
+`categories`, `transactions`, `budgets`) todavía no están creadas en
+Supabase — el schema vive en `src/db/schema.ts` pero falta aplicarlo. Dos
+formas de hacerlo:
 
-- **Rápido (una vez):** pegar el contenido de
-  `src/db/migrations/0000_polite_thena.sql` en Supabase → SQL Editor → New
-  query, y correrlo. Mismo flujo que ya usás para
+- **Rápido (una vez):** pegar el contenido de **las dos** migraciones, en
+  orden, en Supabase → SQL Editor → New query, y correrlas:
+  1. `src/db/migrations/0000_polite_thena.sql`
+  2. `src/db/migrations/0001_military_major_mapleleaf.sql`
+
+  Mismo flujo que ya usás para
   `behavioral-design-platform/supabase/schema.sql`.
 - **Con Drizzle (para cambios futuros de schema):** con `DATABASE_URL`
   cargado en `.env.local`, `npm run db:generate` genera la migración y
@@ -117,3 +124,15 @@ aplicarlo. Dos formas de hacerlo:
   políticas de RLS (si algún día se agregan) NO protegen estas tablas. Cada
   server action en `actions.ts` filtra a mano por `user_id` del usuario
   autenticado; cualquier query nueva tiene que seguir ese mismo patrón.
+- **Finanzas** guarda los montos en centavos (`amount_cents`, integer con
+  signo: positivo = ingreso, negativo = gasto) para no arrastrar errores de
+  punto flotante. Se asume una sola moneda (ARS por defecto en `accounts`);
+  no hay conversión entre monedas.
+- **Foco** no trae una playlist de jazz ni un video de yoga precargados a
+  propósito — el link de un video o playlist específico no es información
+  que se pueda inventar de forma confiable (puede no existir, cambiar o no
+  ser el gusto del usuario). En cambio, `FocusAmbience`
+  (`src/components/focus-ambience.tsx`) deja pegar cualquier link de
+  Spotify o YouTube (audio y/o video, por separado) más presets de color
+  con CSS puro que no dependen de ningún link externo. Todo se guarda en
+  `localStorage`, no en la base.

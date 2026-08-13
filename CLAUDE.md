@@ -34,6 +34,14 @@ roadmap por fases.
   nunca en `public` (esa app ya tiene `public.projects`). Si algún día se
   separa del todo, es un `pg_dump --schema=life_os` a un proyecto nuevo —
   no reescribir esta decisión sin que el usuario lo pida.
+- **Foco sin contenido precargado**: a propósito NO hay una playlist de
+  jazz ni un video de yoga hardcodeados — un link específico es información
+  que no se puede inventar de forma confiable (puede no existir o cambiar).
+  `FocusAmbience` deja que el usuario pegue su propio link de Spotify/YouTube
+  (audio y video por separado) + ofrece presets de color en CSS puro que no
+  dependen de ningún link. No agregues una URL de playlist/video "de
+  ejemplo" sin que el usuario la pida — va contra la instrucción de no
+  inventar URLs.
 
 ## Convenciones de Next.js 16 en este repo (releer antes de tocar código)
 
@@ -55,7 +63,12 @@ roadmap por fases.
     `data-center/tareas/` (tablero por estado).
   - `libreta/page.tsx` (lista + buscador por `?q=`), `libreta/[id]/`
     (editor de nota con tags).
-  - `foco/page.tsx` usa `PomodoroTimer` (solo cliente, sin DB).
+  - `finanzas/` tiene layout con tabs (Resumen/Movimientos/Cuentas/
+    Categorías/Presupuestos). `finanzas/actions.ts` tiene lo compartido
+    (cuentas, categorías, `getMonthSummary`); cada subcarpeta con lógica
+    propia tiene su propio `actions.ts` (`movimientos/`, `presupuestos/`).
+  - `foco/page.tsx` combina `PomodoroTimer` + `FocusAmbience` (los dos
+    solo-cliente, sin DB — todo en localStorage).
 - `src/app/login/` y `src/app/auth/callback/` — fuera del grupo `(app)`,
   sin sidebar.
 - `src/lib/supabase/` — clientes browser/server de Supabase.
@@ -64,15 +77,22 @@ roadmap por fases.
 - `src/lib/tags.ts` — `parseTags()` (helper puro, separado de
   `libreta/actions.ts` porque un archivo `"use server"` solo puede exportar
   funciones async).
-- `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages`, `notes`
-  en el schema `life_os`) y `index.ts` (cliente de conexión).
-  `src/db/migrations/0000_polite_thena.sql` todavía no se aplicó en
-  Supabase (ver README → Base de datos).
+- `src/lib/money.ts` — `formatCents`, `parseAmountToCents`, `currentMonth`
+  (montos siempre en centavos, ver Decisiones).
+- `src/lib/embed.ts` — `toEmbedUrl()`, convierte un link normal de
+  Spotify/YouTube a su URL de embed (usado por `FocusAmbience`).
+- `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages`, `notes`,
+  `accounts`, `categories`, `transactions`, `budgets`, todo en el schema
+  `life_os`) y `index.ts` (cliente de conexión). Dos migraciones
+  (`0000_polite_thena.sql`, `0001_military_major_mapleleaf.sql`) todavía no
+  se aplicaron en Supabase (ver README → Base de datos).
 - `src/components/block-editor.tsx` — wrapper de Yoopta.
   `entity-editor.tsx` — título + editor + autosave debounced (800ms),
   reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
   `task-board.tsx` — tablero de tareas con estado optimista en cliente.
   `pomodoro-timer.tsx` — timer con settings persistidos en localStorage.
+  `focus-ambience.tsx` — presets de color + embeds de audio/video
+  personalizables, todo en localStorage (ver Decisiones).
 
 ## Patrón de server actions (seguir en todo lo nuevo)
 
@@ -83,12 +103,14 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 ## Estado actual
 
-Fase 1 completa: Data Center (páginas con editor de bloques + tareas tipo
-Asana), Libreta (notas con tags y buscador), Pomodoro configurable. Build y
-lint verificados; NO se pudo probar en runtime contra Supabase real desde
-el sandbox donde se armó (red bloqueada a `*.supabase.co`) — probar en
-local o Vercel antes de asumir que algo funciona end-to-end. La migración
-SQL de las tablas todavía no se corrió en Supabase (ver README).
+Fase 1 y Fase 2 completas: Data Center, Libreta, Pomodoro, Finanzas
+(cuentas/categorías/movimientos/presupuestos/resumen) y Foco con fondos
+ambientales. Build y lint verificados en cada paso; NO se pudo probar en
+runtime contra Supabase real desde el sandbox donde se armó (red bloqueada
+a `*.supabase.co`) — probar en local o Vercel antes de asumir que algo
+funciona end-to-end. Las dos migraciones SQL todavía no se corrieron en
+Supabase (ver README).
 
-Próximo paso: Fase 2 (Finanzas + música/yoga embebidos), o pulir Fase 1
-(`@yoopta/ui`, plugin de imágenes) si el uso diario lo pide primero.
+Próximo paso: Fase 3 (GitHub, Google Calendar, generación de docs con IA),
+o pulir lo ya construido (`@yoopta/ui`, plugin de imágenes) si el uso
+diario lo pide primero.
