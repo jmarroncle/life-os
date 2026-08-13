@@ -21,6 +21,13 @@ roadmap por fases.
 - **shadcn/ui**: el CLI no pudo correr durante el scaffold porque el proxy
   de red del entorno bloqueaba `ui.shadcn.com` (npm sí funcionaba). Antes
   de reintentar, verificar si la red del entorno actual lo permite.
+- **Supabase compartido**: por el límite de proyectos free, Life OS usa el
+  MISMO proyecto de Supabase que `behavioral-design-platform`, no uno
+  propio. Para no mezclar datos, todas las tablas de Life OS van en el
+  schema de Postgres `life_os` (ver `src/db/schema.ts`, helper `lifeOs`),
+  nunca en `public` (esa app ya tiene `public.projects`). Si algún día se
+  separa del todo, es un `pg_dump --schema=life_os` a un proyecto nuevo —
+  no reescribir esta decisión sin que el usuario lo pida.
 
 ## Convenciones de Next.js 16 en este repo (releer antes de tocar código)
 

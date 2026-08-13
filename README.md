@@ -44,12 +44,24 @@ cp .env.local.example .env.local  # completar con tu proyecto de Supabase
 npm run dev
 ```
 
-Necesitás un proyecto de [Supabase](https://supabase.com) (gratis) con:
+Life OS **comparte el proyecto de Supabase** de `behavioral-design-platform`
+(por el límite de proyectos gratis) — no hace falta crear uno nuevo:
 
-1. Auth → Providers → Email → habilitar "magic link".
-2. Copiar `Project URL` y `anon public key` a `.env.local`.
-3. Copiar el connection string del pooler (modo "Transaction") a
-   `DATABASE_URL`.
+1. Auth → Providers → Email → confirmar que "magic link" esté habilitado
+   (ya debería estarlo si esa app lo usa).
+2. Auth → URL Configuration → **agregar** (sin borrar las existentes) a
+   "Redirect URLs": `http://localhost:3000/auth/callback` y, cuando exista,
+   la URL de producción de Vercel.
+3. Copiar `Project URL` y `anon public key` (Project Settings → API) a
+   `.env.local` — son los mismos valores que usa `behavioral-design-platform`.
+4. Copiar el connection string del pooler (modo "Transaction", Project
+   Settings → Database) a `DATABASE_URL`.
+
+Las tablas de Life OS viven en su propio schema de Postgres (`life_os`, ver
+`src/db/schema.ts`), separado del `public.projects` de la otra app — así que
+compartir proyecto no mezcla los datos. Si más adelante esto crece y querés
+separarlo del todo, migrar es un `pg_dump --schema=life_os` a un proyecto
+nuevo.
 
 ## Deploy en Vercel
 
