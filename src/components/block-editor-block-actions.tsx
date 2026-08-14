@@ -3,6 +3,7 @@
 import { useYooptaEditor } from "@yoopta/editor";
 import { FloatingBlockActions } from "@yoopta/ui/floating-block-actions";
 import { BlockOptions, useBlockActions } from "@yoopta/ui/block-options";
+import { DragHandle } from "@yoopta/ui/block-dnd";
 
 export function BlockEditorBlockActions() {
   const editor = useYooptaEditor();
@@ -26,10 +27,15 @@ export function BlockEditorBlockActions() {
             >
               +
             </FloatingBlockActions.Button>
+            <DragHandle blockId={blockId} asChild>
+              <FloatingBlockActions.Button title="Arrastrar para mover">
+                ⠿
+              </FloatingBlockActions.Button>
+            </DragHandle>
             <BlockOptions>
               <BlockOptions.Trigger asChild>
                 <FloatingBlockActions.Button title="Opciones del bloque">
-                  ⠿
+                  ⋯
                 </FloatingBlockActions.Button>
               </BlockOptions.Trigger>
               <BlockOptions.Content side="bottom" align="start">

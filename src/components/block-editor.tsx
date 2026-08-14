@@ -5,6 +5,7 @@ import YooptaEditor, {
   createYooptaEditor,
   type YooptaContentValue,
 } from "@yoopta/editor";
+import { BlockDndContext, SortableBlock } from "@yoopta/ui/block-dnd";
 import { plugins, marks } from "@/lib/yoopta-plugins";
 import { BlockEditorToolbar } from "@/components/block-editor-toolbar";
 import { BlockEditorSlashMenu } from "@/components/block-editor-slash-menu";
@@ -33,12 +34,21 @@ export function BlockEditor({
     [],
   );
 
-  return (
+  const editorElement = (
     <YooptaEditor
       editor={editor}
       onChange={(value) => onChange?.(value)}
       placeholder={placeholder}
       className="yoopta-editor-life-os"
+      renderBlock={
+        readOnly
+          ? undefined
+          : ({ children, blockId }) => (
+              <SortableBlock id={blockId} useDragHandle>
+                {children}
+              </SortableBlock>
+            )
+      }
     >
       {!readOnly && (
         <>
@@ -49,4 +59,8 @@ export function BlockEditor({
       )}
     </YooptaEditor>
   );
+
+  if (readOnly) return editorElement;
+
+  return <BlockDndContext editor={editor}>{editorElement}</BlockDndContext>;
 }

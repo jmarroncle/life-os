@@ -29,18 +29,25 @@ roadmap por fases.
   elemento Slate en minúscula) o los comandos dedicados
   `ImageCommands.insertImage` / `TableCommands.insertTable` para
   imagen/tabla. Las acciones por bloque usan `FloatingBlockActions` (de
-  `@yoopta/ui/floating-block-actions`) para el "+"/"⠿" y `BlockOptions` +
-  `useBlockActions()` (de `@yoopta/ui/block-options`) para el menú
-  Duplicar/Eliminar — `useBlockActions` ya trae `duplicateBlock`/
-  `deleteBlock`/`copyBlockLink` implementados, no hace falta reimplementarlos
-  a mano. El drag handle ("⠿") solo abre el menú, todavía no soporta
-  arrastrar para reordenar (eso requiere `@yoopta/ui/block-dnd` +
-  `renderBlock` en `<YooptaEditor>`, una integración más grande, no
-  sumada sin que el usuario lo pida). Todo esto se desactiva cuando
-  `readOnly` es `true`. No se agregó `lucide-react` (no está hoisted en
-  node_modules, es una dependencia interna de `@yoopta/ui`) — los botones
-  usan texto plano (B/I/U/S, +, ⠿) para no sumar una dependencia nueva
-  solo por íconos.
+  `@yoopta/ui/floating-block-actions`) para el "+" (agregar debajo) y
+  `BlockOptions` + `useBlockActions()` (de `@yoopta/ui/block-options`)
+  detrás del "⋯" para el menú Duplicar/Eliminar — `useBlockActions` ya
+  trae `duplicateBlock`/`deleteBlock`/`copyBlockLink` implementados, no
+  hace falta reimplementarlos a mano. El drag-and-drop de bloques usa
+  `@yoopta/ui/block-dnd`: `BlockDndContext` envuelve todo `<YooptaEditor>`
+  en `block-editor.tsx` (recibe `editor` como prop directo, no por
+  contexto), y `renderBlock` en `<YooptaEditor>` envuelve cada bloque en
+  `SortableBlock` (con `useDragHandle` para que el arrastre solo dispare
+  desde el handle, no clickeando/seleccionando texto en cualquier parte
+  del bloque). El "⠿" en `block-editor-block-actions.tsx` es el
+  `DragHandle` (`asChild` sobre el mismo `FloatingBlockActions.Button`) —
+  reordenar llama `editor.moveBlock` internamente en la librería, no hay
+  que wirearlo a mano. Todo esto (toolbar/menú `/`/acciones/dnd) se
+  desactiva cuando `readOnly` es `true` (`renderBlock` queda `undefined` y
+  no se monta `BlockDndContext`). No se agregó `lucide-react` (no está
+  hoisted en node_modules, es una dependencia interna de `@yoopta/ui`) —
+  los botones usan texto plano (B/I/U/S, +, ⠿, ⋯) para no sumar una
+  dependencia nueva solo por íconos.
 - **Imágenes → Supabase Storage**: `src/lib/uploads.ts` (`"use server"`)
   expone `uploadBlockImage(file)`, usado por el plugin `@yoopta/image` vía
   un wrapper client-side en `yoopta-plugins.ts` (`handleImageUpload`) que
@@ -174,10 +181,12 @@ roadmap por fases.
   (cliente de conexión). Cinco migraciones (`0000_` a `0004_`, ver
   `src/db/migrations/`) todavía no se aplicaron en Supabase (ver README →
   Base de datos).
-- `src/components/block-editor.tsx` — wrapper de Yoopta, monta
+- `src/components/block-editor.tsx` — wrapper de Yoopta: envuelve en
+  `BlockDndContext` (drag-and-drop de bloques), usa `renderBlock` para
+  envolver cada bloque en `SortableBlock`, y monta
   `block-editor-toolbar.tsx` (barra flotante de marks),
   `block-editor-slash-menu.tsx` (menú `/` de bloques) y
-  `block-editor-block-actions.tsx` (acciones "+"/"⠿" al pasar el mouse
+  `block-editor-block-actions.tsx` (acciones "+"/"⠿"/"⋯" al pasar el mouse
   sobre un bloque) como children. `entity-editor.tsx` — título + editor +
   autosave debounced (800ms),
   reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
@@ -202,14 +211,15 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas con jerarquía tipo
 Notion, tareas, calendario, generación de docs con IA, PRs), Libreta,
 Pomodoro, Finanzas, Foco. Editor de bloques con barra flotante, menú `/`,
-imágenes (Supabase Storage), tablas y acciones flotantes por bloque
-("+"/duplicar/eliminar). Build y lint verificados en cada paso; NO se pudo
-probar en runtime contra Supabase real ni contra las APIs de
-GitHub/Google/Anthropic desde el sandbox donde se armó (red bloqueada a la
-mayoría de los dominios externos) — probar en local o Vercel antes de
-asumir que algo funciona end-to-end. Las cinco migraciones SQL todavía no
-se corrieron en Supabase (ver README → Base de datos), el bucket de
-Storage tampoco (ver README → Storage, `supabase/storage-setup.sql`), y
+imágenes (Supabase Storage), tablas, y acciones flotantes por bloque
+("+"/arrastrar-reordenar/duplicar/eliminar). Build y lint verificados en
+cada paso; NO se pudo probar en runtime contra Supabase real ni contra las
+APIs de GitHub/Google/Anthropic desde el sandbox donde se armó (red
+bloqueada a la mayoría de los dominios externos) — probar en local o
+Vercel antes de asumir que algo funciona end-to-end. Las cinco migraciones
+SQL todavía no se corrieron en Supabase (ver README → Base de datos), el
+bucket de Storage tampoco (ver README → Storage,
+`supabase/storage-setup.sql`), y
 `GITHUB_TOKEN`/`ANTHROPIC_API_KEY`/`GOOGLE_CLIENT_ID`+`GOOGLE_CLIENT_SECRET`
 todavía no están configuradas (ver README y `.env.local.example`).
 
@@ -219,7 +229,7 @@ seguir sumando features nuevas en conjunto con el uso diario — no asumas
 que el alcance está cerrado en lo ya construido.
 
 Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
-o seguir acercando Data Center al feature-set de Notion (drag-and-drop
-real para reordenar bloques vía `@yoopta/ui/block-dnd`, mover páginas de
-padre por drag-and-drop o selector, íconos/emoji por página, dashboard de
-Inicio) según lo que el usuario pida a medida que lo usa.
+o seguir acercando Data Center al feature-set de Notion (mover páginas de
+padre por drag-and-drop o selector en `page-tree.tsx`, íconos/emoji por
+página, dashboard de Inicio) según lo que el usuario pida a medida que lo
+usa.

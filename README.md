@@ -30,9 +30,9 @@ personal / experimento, código abierto.
   además de la barra flotante (al seleccionar texto: negrita, itálica,
   subrayado, tachado, código), el menú `/` (para insertar o convertir el
   bloque actual, incluidas imágenes y tablas) y las acciones flotantes por
-  bloque (al pasar el mouse: agregar bloque debajo, duplicar, eliminar) de
-  `@yoopta/ui`. Las imágenes se suben a Supabase Storage (ver Storage más
-  abajo).
+  bloque (al pasar el mouse: agregar bloque debajo, arrastrar para
+  reordenar, duplicar, eliminar) de `@yoopta/ui`. Las imágenes se suben a
+  Supabase Storage (ver Storage más abajo).
 
 ## Roadmap
 
@@ -153,15 +153,16 @@ o falta la policy de `insert`).
   comportamiento en runtime.
 - `@yoopta/ui` está integrado para `FloatingToolbar` (marks al seleccionar
   texto), `SlashCommandMenu` (menú `/` para insertar/convertir bloques) y
-  `FloatingBlockActions` + `BlockOptions` (al pasar el mouse sobre un
-  bloque: "+" para agregar uno debajo, "⠿" abre un menú con Duplicar/
-  Eliminar) — ver `block-editor-toolbar.tsx`, `block-editor-slash-menu.tsx`
-  y `block-editor-block-actions.tsx`. Son componentes compuestos (patrón
+  `FloatingBlockActions` + `BlockOptions` + `block-dnd` (al pasar el mouse
+  sobre un bloque: "+" para agregar uno debajo, "⠿" para arrastrar y
+  reordenar, "⋯" abre un menú con Duplicar/Eliminar) — ver
+  `block-editor-toolbar.tsx`, `block-editor-slash-menu.tsx` y
+  `block-editor-block-actions.tsx`. Son componentes compuestos (patrón
   Root/Content/Item, no un drop-in) que se montan como `children` de
-  `<YooptaEditor>`. El drag handle todavía no soporta arrastrar para
-  reordenar bloques (eso es `@yoopta/ui/block-dnd`, un paquete aparte con
-  su propia integración vía `renderBlock`) — por ahora solo abre el menú
-  de opciones.
+  `<YooptaEditor>`. El drag-and-drop en sí lo maneja
+  `BlockEditor` (`block-editor.tsx`): envuelve todo en `BlockDndContext` y
+  usa `renderBlock` para envolver cada bloque en `SortableBlock`; el "⠿"
+  es el `DragHandle` que dispara el arrastre.
 - Todas las queries a la base pasan por Drizzle con conexión directa a
   Postgres (`DATABASE_URL`), no por la REST API de Supabase — o sea que las
   políticas de RLS (si algún día se agregan) NO protegen estas tablas. Cada
