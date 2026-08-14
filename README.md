@@ -26,9 +26,10 @@ personal / experimento, código abierto.
 - **Tailwind CSS v4**. shadcn/ui se suma más adelante (ver nota abajo).
 - **Yoopta-Editor** para el editor de bloques del Data Center y la Libreta —
   MIT, construido sobre Slate.js, exporta a Markdown/HTML. Soporta atajos
-  tipo markdown (`# `, `## `, `- `, etc.) y de teclado (`Cmd+B`, `Cmd+I`, …)
-  sin necesitar UI extra. La barra flotante/menú `/` de `@yoopta/ui` queda
-  pendiente (ver Notas técnicas).
+  tipo markdown (`# `, `## `, `- `, etc.) y de teclado (`Cmd+B`, `Cmd+I`, …),
+  además de la barra flotante (al seleccionar texto: negrita, itálica,
+  subrayado, tachado, código) y el menú `/` (para insertar o convertir el
+  bloque actual) de `@yoopta/ui`.
 
 ## Roadmap
 
@@ -118,11 +119,12 @@ pero falta aplicarlo. Dos formas de hacerlo:
   quedaron afuera del set de Fase 1 a propósito — requieren wirear upload a
   Supabase Storage, que es su propio pedacito de trabajo. Se suman cuando
   haga falta.
-- `@yoopta/ui` (`FloatingToolbar`, `SlashCommandMenu`, `FloatingBlockActions`)
-  no se integró todavía: son componentes compuestos (patrón Root/Content/Item,
-  no un drop-in) que requieren armar la lista de botones/comandos a mano. El
-  editor ya es usable sin eso (atajos markdown + de teclado), pero mejora
-  mucho la UX — buen próximo incremento.
+- `@yoopta/ui` está integrado para `FloatingToolbar` (marks al seleccionar
+  texto) y `SlashCommandMenu` (menú `/` para insertar/convertir bloques) —
+  ver `block-editor-toolbar.tsx` y `block-editor-slash-menu.tsx`. Son
+  componentes compuestos (patrón Root/Content/Item, no un drop-in) que se
+  montan como `children` de `<YooptaEditor>`. `FloatingBlockActions`
+  (drag handle + menú "..." por bloque) todavía no está integrado.
 - Todas las queries a la base pasan por Drizzle con conexión directa a
   Postgres (`DATABASE_URL`), no por la REST API de Supabase — o sea que las
   políticas de RLS (si algún día se agregan) NO protegen estas tablas. Cada

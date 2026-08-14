@@ -17,10 +17,19 @@ roadmap por fases.
   `src/components/block-editor.tsx`. Set de plugins deliberadamente chico
   (paragraph, headings, lists, blockquote, code, link, divider, marks) —
   image/table quedan afuera hasta wirear upload a Supabase Storage.
-  `@yoopta/ui` (toolbar flotante, menú `/`) NO está integrado todavía: son
-  componentes compuestos (Root/Content/Item, no drop-in), documentado como
-  pendiente en el README. No lo agregues sin avisar — es una pieza de UI
-  no trivial.
+  `@yoopta/ui` (barra flotante de marks al seleccionar texto +  menú `/`
+  para insertar/convertir bloques) SÍ está integrado:
+  `block-editor-toolbar.tsx` y `block-editor-slash-menu.tsx`, renderizados
+  como `children` de `<YooptaEditor>` (así reciben el contexto vía
+  `useYooptaEditor()`, igual que hace la librería internamente). Son
+  componentes compuestos (Root/Content/Item), no drop-in — los ítems del
+  menú `/` llaman `editor.toggleBlock(<TypeKey>, { focus: true })` con la
+  key PascalCase de cada plugin (`Paragraph`, `HeadingOne`, `BulletedList`,
+  etc., no el tipo de elemento Slate en minúscula). Se desactivan cuando
+  `readOnly` es `true`. No se agregó `lucide-react` (no está hoisted en
+  node_modules, es una dependencia interna de `@yoopta/ui`) — los botones
+  usan texto plano (B/I/U/S) para no sumar una dependencia nueva solo por
+  íconos.
 - **PWA**: manifest básico ya armado (`src/app/manifest.ts`). Offline real
   (service worker) y push notifications quedan para más adelante, no son
   parte del scaffold inicial.
@@ -130,7 +139,9 @@ roadmap por fases.
   (cliente de conexión). Cinco migraciones (`0000_` a `0004_`, ver
   `src/db/migrations/`) todavía no se aplicaron en Supabase (ver README →
   Base de datos).
-- `src/components/block-editor.tsx` — wrapper de Yoopta.
+- `src/components/block-editor.tsx` — wrapper de Yoopta, monta
+  `block-editor-toolbar.tsx` (barra flotante de marks) y
+  `block-editor-slash-menu.tsx` (menú `/` de bloques) como children.
   `entity-editor.tsx` — título + editor + autosave debounced (800ms),
   reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
   `page-tree.tsx` — árbol recursivo de páginas (expandir/colapsar,

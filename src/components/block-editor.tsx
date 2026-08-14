@@ -6,6 +6,8 @@ import YooptaEditor, {
   type YooptaContentValue,
 } from "@yoopta/editor";
 import { plugins, marks } from "@/lib/yoopta-plugins";
+import { BlockEditorToolbar } from "@/components/block-editor-toolbar";
+import { BlockEditorSlashMenu } from "@/components/block-editor-slash-menu";
 
 export type { YooptaContentValue };
 
@@ -36,6 +38,13 @@ export function BlockEditor({
       onChange={(value) => onChange?.(value)}
       placeholder={placeholder}
       className="yoopta-editor-life-os"
-    />
+    >
+      {!readOnly && (
+        <>
+          <BlockEditorToolbar />
+          <BlockEditorSlashMenu />
+        </>
+      )}
+    </YooptaEditor>
   );
 }
