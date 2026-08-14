@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth"];
+// /api/mcp queda afuera de la sesión de cookies de Supabase a propósito:
+// lo llaman clientes externos (un chat conectado como MCP remoto), nunca
+// un browser logueado acá — su propia autenticación por Bearer token
+// (withMcpAuth, ver src/lib/mcp/auth.ts) es la única puerta.
+const PUBLIC_PATHS = ["/login", "/auth", "/api/mcp"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

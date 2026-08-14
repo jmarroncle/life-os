@@ -182,6 +182,70 @@ roadmap por fases.
   meses (constante `MONTHS_BACK` en `page.tsx`, parámetro `monthsBack` en
   las actions) — no hay selector de rango todavía, sumalo si el usuario
   lo pide.
+- **Servidor MCP embebido en la misma app, no un paquete separado**:
+  `/api/mcp` (`src/app/api/mcp/route.ts`) usa `mcp-handler`
+  (`createMcpHandler` + `withMcpAuth` sobre `@modelcontextprotocol/server`,
+  package peer `@modelcontextprotocol/server`, NO `@modelcontextprotocol/sdk`
+  — nombres distintos, no los confundas) para exponer las tools sobre
+  Streamable HTTP, en vez de un servidor MCP standalone (otro repo, otro
+  deploy). Reutiliza el mismo Vercel/Next.js ya andando — coherente con
+  cómo se armó todo lo demás (GitHub PAT en vez de GitHub App, Google
+  OAuth propio en vez de un servicio aparte: siempre la opción con menos
+  piezas móviles para un solo usuario).
+  - **Auth: un Bearer token fijo (`MCP_ACCESS_TOKEN`), no OAuth 2.1**.
+    `verifyMcpToken` (`src/lib/mcp/auth.ts`) compara en tiempo constante
+    (`crypto.timingSafeEqual`) y arma un `AuthInfo` sintético con
+    `extra: { userId: MCP_USER_ID }`. El SDK soporta un flujo OAuth
+    completo (`protectedResourceHandler`, `oauthMetadataResponse`, etc.)
+    pero implementar un authorization server para un solo usuario es
+    sobre-ingeniería — no lo agregues sin que el usuario lo pida
+    explícitamente. Costo real de esta decisión: al conectar el connector
+    en claude.ai/Claude Desktop hay que pegar el header `Authorization`
+    a mano, no alcanza con pegar la URL.
+  - **Las tools NO reusan `requireUser()` ni las server actions
+    existentes** — `requireUser()` depende de la sesión de cookies de
+    Supabase (`@/lib/supabase/server`), que no existe en un request
+    autenticado por Bearer token. Cada tool en `src/lib/mcp/tools/*.ts`
+    tiene su propia query de Drizzle, scopeada por el `userId` que sale
+    de `ctx.http.authInfo.extra.userId` (accedido siempre a través del
+    wrapper `withUser()` de `src/lib/mcp/tool-helpers.ts`, que también
+    centraliza el try/catch → `errorResult`). Esto duplica algo de lógica
+    con `actions.ts` de cada módulo — deliberado: evita una
+    refactorización grande de código en producción para compartirla. Si
+    en algún momento la duplicación se vuelve dolorosa, extraer las
+    queries de cada `actions.ts` a funciones puras `(userId, ...) => ...`
+    que ambos lados llamen sería el próximo paso, no antes.
+  - **`/api/mcp` está en `PUBLIC_PATHS` de `proxy.ts`, a propósito**: sin
+    eso, el middleware redirige cualquier request sin cookie de Supabase
+    a `/login` antes de que `withMcpAuth` llegue a correr — un cliente
+    MCP externo nunca tiene esa cookie. No le saques esa excepción, y si
+    agregás una ruta `/api/*` nueva pensá si necesita el mismo trato.
+  - **Contenido de página/nota vía MCP = texto plano, sin formato rico**:
+    `src/lib/mcp/block-content.ts` arma bloques `Paragraph` a mano
+    (`buildSimpleContent`, un bloque por párrafo separado por línea en
+    blanco) y los lee de vuelta como texto (`extractPlainText`), porque
+    `markdown.deserialize` de `@yoopta/exports` necesita `DOMParser` —no
+    corre en una route de Node/serverless— mismo motivo por el que
+    `generate-doc-form.tsx` hace esa conversión en el cliente. Títulos,
+    listas, etc. no se pueden crear desde el chat todavía.
+  - **Sin tools de Reportes por ahora**: `reportes/actions.ts` también
+    depende de `requireUser()`, mismo problema que el resto — se puede
+    sumar duplicando su agregación como se hizo con Finanzas, pero quedó
+    afuera del primer corte por prioridad (tareas era el pedido explícito
+    del usuario, "crear procesos").
+  - Herramientas actuales (19): `life_os_list_tasks`,
+    `life_os_create_task`, `life_os_update_task`, `life_os_delete_task`,
+    `life_os_list_projects`, `life_os_list_pages`, `life_os_get_page`,
+    `life_os_create_page`, `life_os_update_page`, `life_os_delete_page`,
+    `life_os_list_notes`, `life_os_get_note`, `life_os_create_note`,
+    `life_os_delete_note`, `life_os_list_accounts`,
+    `life_os_list_categories`, `life_os_get_finance_summary`,
+    `life_os_list_transactions`, `life_os_create_transaction`.
+  - Probado localmente con `npm run dev` + `curl` (handshake `initialize`
+    y `tools/list`) contra el proxy y el auth — no se pudo probar
+    `tools/call` real de punta a punta desde el sandbox (`DATABASE_URL`
+    no está en este entorno), así que probalo vos en Vercel antes de
+    asumir que las queries andan.
 
 ## Convenciones de Next.js 16 en este repo (releer antes de tocar código)
 
@@ -260,6 +324,14 @@ roadmap por fases.
 - `src/app/api/google-calendar/connect/` y `.../callback/` — route
   handlers del flow de OAuth (fuera del grupo `(app)` porque no renderizan
   UI, pero igual protegidos por `proxy.ts`).
+- `src/app/api/mcp/route.ts` — servidor MCP remoto, único `api/*` que está
+  en `PUBLIC_PATHS` de `proxy.ts` (auth propia por Bearer token, no
+  cookies de Supabase — ver Decisiones). `src/lib/mcp/auth.ts`
+  (`verifyMcpToken`), `src/lib/mcp/tool-helpers.ts` (`withUser`,
+  `jsonResult`, `errorResult`), `src/lib/mcp/block-content.ts`
+  (texto plano ↔ bloques Yoopta simples), `src/lib/mcp/tools/*.ts`
+  (una tool-registration function por dominio: tasks, pages, notes,
+  finance) + `tools/index.ts` (`registerAllTools`).
 - `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages` —con
   `parentId` autoreferenciado para jerarquía e `icon` para el emoji—,
   `notes`, `accounts`, `categories`, `transactions`, `budgets`,
@@ -301,27 +373,37 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 ## Estado actual
 
-Fases 1 a 4 completas. Inicio (dashboard agregando datos de todos los
+Fases 1 a 5 completas. Inicio (dashboard agregando datos de todos los
 módulos, con widgets que se pueden mostrar/ocultar y reordenar), Data
 Center (páginas con jerarquía tipo Notion —reparentar arrastrando una
 página sobre otra, ícono/emoji por página—, tareas, calendario,
 generación de docs con IA, PRs), Libreta, Finanzas, **Reportes**
-(tendencia mensual, categorías con más gasto, productividad), Foco.
-Editor de bloques con barra flotante, menú `/`, imágenes (Supabase
-Storage), tablas, y acciones flotantes por bloque
+(tendencia mensual, categorías con más gasto, productividad), Foco, y un
+**servidor MCP remoto** (`/api/mcp`) para conectar Life OS a un chat. Editor
+de bloques con barra flotante, menú `/`, imágenes (Supabase Storage),
+tablas, y acciones flotantes por bloque
 ("+"/arrastrar-reordenar/duplicar/eliminar). Modo oscuro con toggle
-explícito. Build y lint verificados en cada paso; NO se pudo probar en
-runtime contra Supabase real ni contra las APIs de GitHub/Google/Anthropic
-desde el sandbox donde se armó (red bloqueada a la mayoría de los
-dominios externos) — probar en local o Vercel antes de asumir que algo
-funciona end-to-end, y en particular **probar el modo oscuro visualmente**
-(la técnica de variables CSS globales no se pudo verificar en un browser
-real desde acá, solo se confirmó que el CSS compila con los valores
-esperados). Las seis migraciones SQL todavía no se corrieron en Supabase
-(ver README → Base de datos), el bucket de Storage tampoco (ver README →
-Storage, `supabase/storage-setup.sql`), y
-`GITHUB_TOKEN`/`ANTHROPIC_API_KEY`/`GOOGLE_CLIENT_ID`+`GOOGLE_CLIENT_SECRET`
-todavía no están configuradas (ver README y `.env.local.example`).
+explícito.
+
+Build y lint verificados en cada paso. Estado confirmado en runtime real
+(no solo build local):
+- Las seis migraciones SQL **ya corrieron** en Supabase y `DATABASE_URL`
+  quedó bien configurada en Vercel — confirmado revisando
+  `get_runtime_errors` del proyecto en Vercel (cero errores después del
+  fix; antes fallaba todo con `ECONNREFUSED 127.0.0.1:5432`, señal de que
+  `DATABASE_URL` faltaba o estaba mal). Login con magic link funcionando.
+- El servidor MCP se probó localmente con `npm run dev` + `curl` (auth
+  sin token → 401, con token correcto → `initialize` y `tools/list` OK,
+  19 tools registradas) — pero **no** se pudo probar un `tools/call` real
+  de punta a punta porque este sandbox no tiene `DATABASE_URL`. Probarlo
+  contra el deploy de Vercel antes de asumir que las queries de las tools
+  andan.
+- El bucket de Storage (`supabase/storage-setup.sql`) y las variables de
+  Fase 3 (`ANTHROPIC_API_KEY`/`GITHUB_TOKEN`/`GOOGLE_CLIENT_ID`+
+  `GOOGLE_CLIENT_SECRET`) — sin confirmar, puede que sigan pendientes del
+  lado del usuario (ver README).
+- El modo oscuro (Fase 4) tampoco se pudo ver en un browser real desde
+  acá — solo se confirmó que el CSS compila con los valores esperados.
 
 El usuario pidió explícitamente que Life OS sea "casi un clon de Notion":
 todas las features clave de Notion tienen que estar presentes, y se van a
@@ -334,4 +416,6 @@ Ideas ya identificadas pero explícitamente NO implementadas (no las
 sumes sin que el usuario lo pida): selector de rango de fechas en
 Reportes (hoy fijo a 6 meses), acentos de color custom más allá de
 claro/oscuro, drag-and-drop de filas/columnas dentro de una tabla del
-editor.
+editor, tools de MCP para Reportes y formato rico (títulos/listas) al
+crear páginas/notas desde el chat, flujo OAuth para el MCP en vez de
+Bearer token fijo.

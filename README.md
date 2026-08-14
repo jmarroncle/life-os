@@ -25,6 +25,10 @@ personal / experimento, código abierto.
 - **Foco**: timer Pomodoro configurable + fondos ambientales (presets de
   color o tu propio embed de playlist/video), combinables en una "sesión de
   foco".
+- **MCP** (`/api/mcp`): Life OS se puede conectar como servidor MCP remoto
+  desde un chat (claude.ai, Claude Desktop, Claude Code) para leer y crear
+  tareas, páginas, notas y movimientos sin abrir la app. Ver la sección
+  MCP más abajo.
 
 ## Stack
 
@@ -65,6 +69,9 @@ personal / experimento, código abierto.
   ingresos/gastos de los últimos 6 meses, categorías con más gasto del
   período y estadísticas de productividad (tareas por estado, cantidad de
   páginas y notas).
+- **Fase 5 (hecho)**: servidor MCP remoto (`/api/mcp`) para conectar Life
+  OS a un chat — tareas, páginas, notas y finanzas por conversación, sin
+  abrir la app. Ver la sección MCP más abajo.
 
 ## Desarrollo local
 
@@ -125,6 +132,41 @@ migraciones de Postgres). Correr una sola vez en Supabase → SQL Editor:
 Sin este paso, subir una imagen desde el editor falla (el bucket no existe
 o falta la policy de `insert`).
 
+## MCP
+
+Life OS expone un servidor MCP remoto en `/api/mcp` (Streamable HTTP) para
+conectarlo como una fuente más en un chat — leer tareas/páginas/notas,
+crear una tarea ("procesos"), cargar un movimiento, etc., todo por
+conversación en vez de la UI web.
+
+**Setup (una vez):**
+
+1. Generá un secreto largo: `openssl rand -hex 32`. Cargalo como
+   `MCP_ACCESS_TOKEN` en Vercel (Environment Variables) y en tu
+   `.env.local` si vas a probarlo en local.
+2. Buscá tu user id de Supabase Auth (Authentication → Users → tu usuario,
+   es el UUID que aparece ahí) y cargalo como `MCP_USER_ID`, mismo lugar.
+3. Redeployá (como con cualquier variable de entorno nueva, no toma efecto
+   hasta el próximo deployment).
+
+**Conectarlo desde un cliente MCP** (claude.ai → Settings → Connectors →
+Add custom connector, o el `.mcp.json`/config equivalente de Claude
+Desktop/Claude Code):
+
+- URL: `https://tu-dominio.vercel.app/api/mcp`
+- Header: `Authorization: Bearer <tu MCP_ACCESS_TOKEN>`
+
+No es un flujo OAuth — es un solo secreto fijo, así que hay que agregar
+ese header a mano al configurar el connector (no alcanza con pegar la URL
+sola).
+
+**Qué puede hacer hoy:** listar/crear/actualizar/borrar tareas y
+proyectos, listar/crear/actualizar/borrar páginas y notas (contenido en
+texto plano — el editor de bloques con formato rico solo funciona desde
+la app), y leer/crear cuentas, categorías, movimientos y el resumen
+financiero del mes. Ver Notas técnicas para el detalle de por qué no
+soporta formato rico ni reportes todavía.
+
 ## Deploy en Vercel
 
 1. Importar este repo en [vercel.com/new](https://vercel.com/new).
@@ -136,6 +178,34 @@ o falta la policy de `insert`).
 
 ## Notas técnicas
 
+- **Servidor MCP** (`src/app/api/mcp/route.ts`): usa `mcp-handler`
+  (`createMcpHandler` + `withMcpAuth`) sobre `@modelcontextprotocol/server`,
+  con transporte Streamable HTTP stateless (sin sesiones — cada request es
+  autocontenido, más simple de escalar en serverless que el modo con
+  `sessionIdGenerator`). Auth por un solo Bearer token fijo
+  (`MCP_ACCESS_TOKEN`, comparado en tiempo constante con
+  `crypto.timingSafeEqual`) en vez de un flujo OAuth completo — mismo
+  criterio que `GITHUB_TOKEN`: Life OS es de un solo usuario, no vale la
+  pena un authorization server propio. El `userId` autorizado
+  (`MCP_USER_ID`) viaja en el `AuthInfo.extra` que arma `verifyMcpToken`
+  (`src/lib/mcp/auth.ts`) y es lo que cada tool usa para filtrar sus
+  queries — no hay sesión de cookies acá, así que las tools **no**
+  reusan las server actions existentes (`requireUser()` depende de
+  cookies de Supabase); tienen su propia lógica de acceso a Drizzle en
+  `src/lib/mcp/tools/*.ts`, aceptando algo de duplicación con
+  `actions.ts` a cambio de no arriesgar una refactorización grande de
+  código ya en producción. `/api/mcp` está explícitamente afuera del
+  chequeo de sesión de `proxy.ts` (agregado a `PUBLIC_PATHS`) — si no,
+  el middleware redirige cualquier request sin cookie a `/login` antes
+  de que la auth propia del MCP (`withMcpAuth`) llegue a correr.
+  El contenido de páginas/notas creado desde acá se guarda como bloques
+  `Paragraph` armados a mano (`src/lib/mcp/block-content.ts`, un párrafo
+  por línea en blanco) porque `markdown.deserialize` de `@yoopta/exports`
+  necesita `DOMParser` — no corre en una route serverless, mismo motivo
+  por el que `generate-doc-form.tsx` hace esa conversión en el cliente.
+  Sin reportes todavía (`reportes/actions.ts` también depende de
+  `requireUser()`) — se puede sumar más adelante duplicando su lógica de
+  agregación, como se hizo con el resto.
 - **Modo oscuro**: toggle explícito en el sidebar (`theme-toggle.tsx`),
   persistido en `localStorage` (`life-os:theme`) y aplicado como
   `data-theme="dark"` en `<html>`. Un script inline al principio del
