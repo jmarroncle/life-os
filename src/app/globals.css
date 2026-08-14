@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/*
+ * Life OS todavía no tiene modo oscuro (queda para la Fase 4,
+ * personalización). A propósito NO hay una media query de
+ * prefers-color-scheme acá: el create-next-app default la traía y
+ * generaba un fondo negro por atrás peleando con el tema claro del resto
+ * de la app (sidebar blanca, cards blancas) — un lío visual. Cuando se
+ * construya el modo oscuro real, se hace con un toggle explícito, no con
+ * la preferencia del sistema.
+ */
 :root {
-  --background: #ffffff;
+  --background: #fafafa;
   --foreground: #171717;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -12,15 +22,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
