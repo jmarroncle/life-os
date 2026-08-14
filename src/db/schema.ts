@@ -235,6 +235,88 @@ export const budgets = lifeOs.table(
   ],
 );
 
+// --- Bases de datos genéricas ---
+// El equivalente de una "database" de Notion: colecciones con columnas
+// tipadas y filas, en vez de un módulo con schema fijo. A diferencia de
+// pages/notes (un solo jsonb "content" con bloques), acá cada fila guarda
+// sus valores en un jsonb "values" keyeado por columnId — no hace falta
+// una tabla de celdas separada porque no hay bloques de texto rico adentro,
+// solo valores escalares (o arrays, para multi_select).
+
+export const databaseColumnType = lifeOs.enum("database_column_type", [
+  "text",
+  "number",
+  "select",
+  "multi_select",
+  "date",
+  "checkbox",
+  "url",
+]);
+
+export const databases = lifeOs.table(
+  "databases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    icon: text("icon"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("databases_user_id_idx").on(table.userId)],
+);
+
+export const databaseColumns = lifeOs.table(
+  "database_columns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    databaseId: uuid("database_id")
+      .notNull()
+      .references(() => databases.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    type: databaseColumnType("type").notNull().default("text"),
+    // Opciones para select/multi_select (las etiquetas disponibles). Null
+    // para el resto de los tipos.
+    options: text("options").array(),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("database_columns_database_id_idx").on(table.databaseId)],
+);
+
+export const databaseRows = lifeOs.table(
+  "database_rows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    databaseId: uuid("database_id")
+      .notNull()
+      .references(() => databases.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    // { [columnId]: valor }. El tipo de cada valor depende del tipo de la
+    // columna: text/url/select -> string, number -> number, multi_select ->
+    // string[], date -> string "YYYY-MM-DD", checkbox -> boolean.
+    values: jsonb("values").notNull().default({}),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("database_rows_database_id_idx").on(table.databaseId)],
+);
+
 // --- Google Calendar ---
 // Un solo usuario por ahora, así que una fila por user_id alcanza.
 

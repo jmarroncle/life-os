@@ -296,6 +296,32 @@ roadmap por fases.
     `tools/call` real de punta a punta desde el sandbox (`DATABASE_URL`
     no está en este entorno), así que probalo vos en Vercel antes de
     asumir que las queries andan.
+  - **Sin tools de MCP para el módulo de Bases de datos todavía** (ver
+    bullet siguiente) — se puede sumar `life_os_list_databases`,
+    `life_os_create_row`, etc. más adelante si hace falta crear/leer filas
+    desde el chat.
+- **Módulo "Bases de datos" (`/bases`), el equivalente a las databases de
+  Notion**: pensado para el caso de importar un workspace de Notion entero
+  (páginas → módulo Pages existente, databases → este módulo nuevo).
+  Diseño: `databases` (colección) + `database_columns` (nombre, `type` —
+  `text`/`number`/`select`/`multi_select`/`date`/`checkbox`/`url` —,
+  `options` para select/multi-select) + `database_rows` con un solo
+  `values: jsonb` keyeado por `columnId` (NO una tabla de celdas separada:
+  no hace falta, los valores son siempre escalares o arrays simples, a
+  diferencia de `pages.content`/`notes.content` que sí necesitan bloques de
+  texto rico). La tabla en `/bases/[id]` (`src/components/database-table.tsx`)
+  usa CSS Grid en vez de un `<table>` real — cada fila es un `<form>` que
+  envuelve todas sus celdas como inputs (siempre "en modo edición", sin
+  toggle de estado en el cliente) más un botón "✓" (submit normal) y uno
+  "×" con `formAction` propio para borrar; eso evita el problema de que
+  `<form>` no puede envolver `<tr>` en una tabla HTML real, y evita necesitar
+  estado de "cuál fila estoy editando" en el cliente. Al armar los `where()`
+  con dos condiciones (id + userId) usar siempre `and(...)` de
+  `drizzle-orm` — **nunca `condA && condB`**: los objetos que devuelve
+  `eq()` son siempre truthy, así que `&&` devuelve el segundo objeto solo y
+  descarta el primero en silencio (bug real que apareció y se corrigió acá:
+  un `deleteDatabase(id)` con `eq(id) && eq(userId)` termina borrando
+  *todas* las bases del usuario, no solo esa una).
 
 ## Convenciones de Next.js 16 en este repo (releer antes de tocar código)
 

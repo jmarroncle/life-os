@@ -25,6 +25,10 @@ personal / experimento, código abierto.
 - **Foco**: timer Pomodoro configurable + fondos ambientales (presets de
   color o tu propio embed de playlist/video), combinables en una "sesión de
   foco".
+- **Bases de datos** (`/bases`): el equivalente a las databases de Notion —
+  colecciones con columnas propias (texto, número, select, multi-select,
+  fecha, checkbox, URL) y filas, para datos que no encajan en ningún otro
+  módulo (listas de clientes, links, suites de producto, etc.).
 - **MCP** (`/api/mcp`): Life OS se puede conectar como servidor MCP remoto
   desde un chat (claude.ai, Claude Desktop, Claude Code) para leer y crear
   tareas, páginas, notas y movimientos sin abrir la app. Ver la sección
