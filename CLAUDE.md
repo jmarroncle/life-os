@@ -192,16 +192,66 @@ roadmap por fases.
   cómo se armó todo lo demás (GitHub PAT en vez de GitHub App, Google
   OAuth propio en vez de un servicio aparte: siempre la opción con menos
   piezas móviles para un solo usuario).
-  - **Auth: un Bearer token fijo (`MCP_ACCESS_TOKEN`), no OAuth 2.1**.
-    `verifyMcpToken` (`src/lib/mcp/auth.ts`) compara en tiempo constante
-    (`crypto.timingSafeEqual`) y arma un `AuthInfo` sintético con
-    `extra: { userId: MCP_USER_ID }`. El SDK soporta un flujo OAuth
-    completo (`protectedResourceHandler`, `oauthMetadataResponse`, etc.)
-    pero implementar un authorization server para un solo usuario es
-    sobre-ingeniería — no lo agregues sin que el usuario lo pida
-    explícitamente. Costo real de esta decisión: al conectar el connector
-    en claude.ai/Claude Desktop hay que pegar el header `Authorization`
-    a mano, no alcanza con pegar la URL.
+  - **Auth: dos caminos, Bearer token fijo Y OAuth 2.1 con PKCE**.
+    Se implementó primero sólo el Bearer token fijo (`MCP_ACCESS_TOKEN`,
+    comparado en tiempo constante con `crypto.timingSafeEqual`), asumiendo
+    que alcanzaba con pegar el header `Authorization` a mano al agregar el
+    connector en claude.ai. **Eso era incorrecto**: la UI de "Add custom
+    connector" de claude.ai no tiene ningún campo para pegar headers — al
+    tocar "Connect" intenta un flujo OAuth 2.1 automático (llega a
+    `/authorize` sin que existiera esa ruta → 404). Por eso se agregó un
+    mini authorization server propio (`src/app/api/mcp/oauth/*` +
+    `src/app/.well-known/oauth-*`, ver el bullet siguiente) que sí resuelve
+    ese flujo. El Bearer token fijo **se mantuvo** como segundo camino
+    porque sigue siendo más simple para clientes que sí aceptan headers
+    manuales (Claude Code CLI vía `--header`, config JSON de Claude
+    Desktop) — no hay motivo para forzar el OAuth ahí. `verifyMcpToken`
+    (`src/lib/mcp/auth.ts`) prueba primero el token fijo
+    (`extra: { userId: MCP_USER_ID }`) y si no matchea, valida si es un
+    access token emitido por el authorization server propio (ver abajo).
+  - **Mini authorization server OAuth, sin base de datos nueva**: en vez
+    de una tabla de clients/codes/tokens, todo es **stateless**:
+    authorization codes y access tokens son JSON firmado con
+    HMAC-SHA256 (`src/lib/mcp/oauth-tokens.ts`), usando el mismo
+    `MCP_ACCESS_TOKEN` como clave de firma (así no hace falta una env var
+    más). Piezas:
+    - `/.well-known/oauth-authorization-server` (RFC 8414) y
+      `/.well-known/oauth-protected-resource` (RFC 9728, generado con
+      `protectedResourceHandler` de `mcp-handler`) — metadata que
+      `withMcpAuth` referencia vía `resource_metadata` en el header
+      `WWW-Authenticate` del 401 (confirmado con `curl -i`: sin auth,
+      el 401 apunta a `/.well-known/oauth-protected-resource`).
+    - `/api/mcp/oauth/register` (RFC 7591, dynamic client registration):
+      **no persiste nada**, devuelve un `client_id` random cualquiera y
+      nunca se vuelve a chequear. Esto es aceptable sólo porque la
+      seguridad real está en los dos puntos siguientes, no acá.
+    - `/api/mcp/oauth/authorize`: GET muestra una pantalla de
+      consentimiento HTML simple (o redirige a `/login?next=...` si no
+      hay sesión de Supabase — `login/actions.ts` y `login/page.tsx` se
+      modificaron para propagar ese `next` a través del magic link vía
+      `emailRedirectTo`). POST emite el code (`issueAuthorizationCode`)
+      atado al `userId` de la sesión real que aprobó, no a un `MCP_USER_ID`
+      fijo. **Sólo acepta `redirect_uri` cuyo host esté en
+      `src/lib/mcp/oauth-redirect-allowlist.ts`** (hoy `claude.ai`,
+      `claude.com`, `localhost`) — sin esto, como `register` no valida
+      nada, cualquiera podría armar un link de authorize con su propio
+      redirect y robarse el code si el usuario (verías vos, el único que
+      puede loguearse acá) lo aprueba sin fijarse en el dominio mostrado
+      en la pantalla de consentimiento.
+    - `/api/mcp/oauth/token`: intercambia code por access token,
+      validando PKCE S256 (`code_verifier` → SHA-256 → debe matchear el
+      `code_challenge` guardado en el code) y que el `redirect_uri`
+      coincida con el de `/authorize`. Sin refresh tokens — el access
+      token dura 90 días (`ACCESS_TOKEN_TTL_SECONDS`), después hay que
+      volver a autorizar.
+    - Probado de punta a punta en local con `curl` + un script Node que
+      replica `pack()`/PKCE a mano (sin sesión real de Supabase, porque
+      el sandbox no tiene browser): metadata, `register` con allowlist,
+      redirect a `/login?next=` sin sesión, `token` con PKCE válido e
+      inválido, y el access token resultante aceptado por `initialize` en
+      `/api/mcp`. **No probado con claude.ai real** (requiere el deploy
+      en Vercel + una sesión de browser real) — el usuario tiene que
+      probar el connector después del deploy.
   - **Las tools NO reusan `requireUser()` ni las server actions
     existentes** — `requireUser()` depende de la sesión de cookies de
     Supabase (`@/lib/supabase/server`), que no existe en un request
@@ -324,14 +374,19 @@ roadmap por fases.
 - `src/app/api/google-calendar/connect/` y `.../callback/` — route
   handlers del flow de OAuth (fuera del grupo `(app)` porque no renderizan
   UI, pero igual protegidos por `proxy.ts`).
-- `src/app/api/mcp/route.ts` — servidor MCP remoto, único `api/*` que está
-  en `PUBLIC_PATHS` de `proxy.ts` (auth propia por Bearer token, no
-  cookies de Supabase — ver Decisiones). `src/lib/mcp/auth.ts`
-  (`verifyMcpToken`), `src/lib/mcp/tool-helpers.ts` (`withUser`,
-  `jsonResult`, `errorResult`), `src/lib/mcp/block-content.ts`
-  (texto plano ↔ bloques Yoopta simples), `src/lib/mcp/tools/*.ts`
-  (una tool-registration function por dominio: tasks, pages, notes,
-  finance) + `tools/index.ts` (`registerAllTools`).
+- `src/app/api/mcp/route.ts` — servidor MCP remoto, en `PUBLIC_PATHS` de
+  `proxy.ts` (auth propia por Bearer token u OAuth, no cookies de Supabase
+  — ver Decisiones). `src/lib/mcp/auth.ts` (`verifyMcpToken`),
+  `src/lib/mcp/tool-helpers.ts` (`withUser`, `jsonResult`, `errorResult`),
+  `src/lib/mcp/block-content.ts` (texto plano ↔ bloques Yoopta simples),
+  `src/lib/mcp/tools/*.ts` (una tool-registration function por dominio:
+  tasks, pages, notes, finance) + `tools/index.ts` (`registerAllTools`).
+- `src/app/api/mcp/oauth/{register,authorize,token}/route.ts` +
+  `src/app/.well-known/oauth-{authorization-server,protected-resource}/route.ts`
+  — mini authorization server OAuth 2.1/PKCE para el connector de
+  claude.ai (ver Decisiones). `src/lib/mcp/oauth-tokens.ts` (codes/tokens
+  stateless firmados con HMAC), `src/lib/mcp/oauth-redirect-allowlist.ts`
+  (hosts de `redirect_uri` permitidos).
 - `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages` —con
   `parentId` autoreferenciado para jerarquía e `icon` para el emoji—,
   `notes`, `accounts`, `categories`, `transactions`, `budgets`,

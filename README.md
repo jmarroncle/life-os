@@ -143,22 +143,36 @@ conversación en vez de la UI web.
 
 1. Generá un secreto largo: `openssl rand -hex 32`. Cargalo como
    `MCP_ACCESS_TOKEN` en Vercel (Environment Variables) y en tu
-   `.env.local` si vas a probarlo en local.
-2. Buscá tu user id de Supabase Auth (Authentication → Users → tu usuario,
-   es el UUID que aparece ahí) y cargalo como `MCP_USER_ID`, mismo lugar.
+   `.env.local` si vas a probarlo en local. Este secreto cumple dos roles:
+   es el Bearer token fijo para clientes que aceptan headers manuales
+   (Claude Code CLI, config de Claude Desktop), y es también la clave con
+   la que se firman los tokens del mini authorization server OAuth (ver
+   más abajo) — no hace falta una env var extra para eso.
+2. Si vas a usar el Bearer token fijo (no el flujo OAuth), buscá tu user
+   id de Supabase Auth (Authentication → Users → tu usuario, es el UUID
+   que aparece ahí) y cargalo como `MCP_USER_ID`, mismo lugar.
 3. Redeployá (como con cualquier variable de entorno nueva, no toma efecto
    hasta el próximo deployment).
 
-**Conectarlo desde un cliente MCP** (claude.ai → Settings → Connectors →
-Add custom connector, o el `.mcp.json`/config equivalente de Claude
-Desktop/Claude Code):
+**Conectarlo desde claude.ai (web/Desktop)** — Settings → Connectors → Add
+custom connector:
 
-- URL: `https://tu-dominio.vercel.app/api/mcp`
-- Header: `Authorization: Bearer <tu MCP_ACCESS_TOKEN>`
+- Name: `Life OS`
+- Remote MCP server URL: `https://tu-dominio.vercel.app/api/mcp`
+- Click "Connect": claude.ai hace el flujo OAuth solo (descubre
+  `/.well-known/oauth-authorization-server`, se registra, y abre una
+  pestaña con la pantalla de consentimiento de Life OS). Si no tenés una
+  sesión de Supabase activa en esa pestaña, te manda primero a `/login`
+  (magic link) y vuelve automáticamente. No hay que pegar ningún header
+  a mano — esa UI no lo permite, por eso existe el flujo OAuth (ver Notas
+  técnicas).
 
-No es un flujo OAuth — es un solo secreto fijo, así que hay que agregar
-ese header a mano al configurar el connector (no alcanza con pegar la URL
-sola).
+**Conectarlo desde Claude Code CLI** (Bearer token fijo, sin OAuth):
+
+```bash
+claude mcp add --transport http life-os https://tu-dominio.vercel.app/api/mcp \
+  --header "Authorization: Bearer <tu MCP_ACCESS_TOKEN>"
+```
 
 **Qué puede hacer hoy:** listar/crear/actualizar/borrar tareas y
 proyectos, listar/crear/actualizar/borrar páginas y notas (contenido en
@@ -206,6 +220,27 @@ soporta formato rico ni reportes todavía.
   Sin reportes todavía (`reportes/actions.ts` también depende de
   `requireUser()`) — se puede sumar más adelante duplicando su lógica de
   agregación, como se hizo con el resto.
+- **Mini authorization server OAuth** (`src/app/api/mcp/oauth/*`,
+  `src/app/.well-known/oauth-*`): claude.ai (y otros clientes MCP
+  "remotos") no ofrecen forma de pegar un Bearer token a mano al agregar
+  un connector — fuerzan el flujo OAuth 2.1 con PKCE del spec de MCP. En
+  vez de implementar un authorization server completo con base de datos,
+  los authorization codes y access tokens son **stateless**: JSON firmado
+  con HMAC-SHA256 usando `MCP_ACCESS_TOKEN` como clave
+  (`src/lib/mcp/oauth-tokens.ts`), sin tabla nueva ni refresh tokens (el
+  access token dura 90 días). La registración dinámica de clientes
+  (`/api/mcp/oauth/register`, RFC 7591) no persiste nada — devuelve un
+  `client_id` cualquiera y no se vuelve a chequear —, así que la
+  seguridad real pasa por dos cosas: (1) la pantalla de consentimiento en
+  `/api/mcp/oauth/authorize` exige una sesión de Supabase real (reusa el
+  login por magic link existente, con un `?next=` que ahora
+  `login/actions.ts` y `login/page.tsx` saben propagar), y (2) una
+  allowlist de hosts de `redirect_uri` (`oauth-redirect-allowlist.ts`,
+  hoy `claude.ai`/`claude.com`/`localhost`) para que nadie arme un link
+  de authorize con un redirect propio y se robe el código si el usuario
+  lo aprueba sin fijarse. El Bearer token fijo (`MCP_ACCESS_TOKEN` +
+  `MCP_USER_ID`) sigue funcionando en paralelo — `verifyMcpToken`
+  (`src/lib/mcp/auth.ts`) acepta cualquiera de los dos.
 - **Modo oscuro**: toggle explícito en el sidebar (`theme-toggle.tsx`),
   persistido en `localStorage` (`life-os:theme`) y aplicado como
   `data-theme="dark"` en `<html>`. Un script inline al principio del
