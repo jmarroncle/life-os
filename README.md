@@ -6,6 +6,9 @@ personal / experimento, código abierto.
 
 ## Módulos
 
+- **Inicio**: dashboard del día — tareas pendientes, resumen financiero del
+  mes, próximos eventos de Google Calendar (si está conectado), páginas y
+  notas recientes, y acceso rápido a una sesión de foco.
 - **Data Center**: páginas tipo Notion (editor de bloques, con subpáginas
   anidadas — árbol de páginas/carpetas sin límite de profundidad,
   reordenable arrastrando una página sobre otra o al nivel raíz — y un

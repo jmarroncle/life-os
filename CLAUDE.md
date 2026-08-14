@@ -160,6 +160,17 @@ roadmap por fases.
 
 - `src/app/(app)/` — rutas protegidas por `proxy.ts`, con el layout del
   sidebar (Inicio, Data Center, Libreta, Finanzas, Foco).
+  - `page.tsx` (Inicio) es un dashboard de solo lectura: agrega datos de
+    todos los demás módulos en paralelo (`Promise.all`) — tareas
+    pendientes (`data-center/tareas/actions`), resumen del mes
+    (`finanzas/actions`), páginas y notas recientes
+    (`data-center/actions`, `libreta/actions`), y una preview de los
+    próximos eventos de Google Calendar con su propio chequeo de conexión
+    (mismo patrón que `data-center/calendario/page.tsx`: si no hay fila en
+    `google_calendar_connections`, muestra un link para conectar en vez de
+    intentar llamar a la API). No tiene lógica propia ni tablas nuevas,
+    solo lee y linkea a cada sección — no le agregues acciones de
+    escritura acá, van en el módulo correspondiente.
   - `data-center/` tiene su propio layout con tabs (Páginas/Tareas/
     Calendario/Generar con IA): `data-center/page.tsx` (árbol de páginas,
     ver `src/components/page-tree.tsx`), `data-center/paginas/[id]/`
@@ -241,11 +252,12 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 ## Estado actual
 
-Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas con jerarquía tipo
-Notion —reparentar arrastrando una página sobre otra, ícono/emoji por
-página—, tareas, calendario, generación de docs con IA, PRs), Libreta,
-Pomodoro, Finanzas, Foco. Editor de bloques con barra flotante, menú `/`,
-imágenes (Supabase Storage), tablas, y acciones flotantes por bloque
+Fase 1, Fase 2 y Fase 3 completas: Inicio (dashboard agregando datos de
+todos los módulos), Data Center (páginas con jerarquía tipo Notion
+—reparentar arrastrando una página sobre otra, ícono/emoji por página—,
+tareas, calendario, generación de docs con IA, PRs), Libreta, Pomodoro,
+Finanzas, Foco. Editor de bloques con barra flotante, menú `/`, imágenes
+(Supabase Storage), tablas, y acciones flotantes por bloque
 ("+"/arrastrar-reordenar/duplicar/eliminar). Build y lint verificados en
 cada paso; NO se pudo probar en runtime contra Supabase real ni contra las
 APIs de GitHub/Google/Anthropic desde el sandbox donde se armó (red
@@ -262,7 +274,7 @@ todas las features clave de Notion tienen que estar presentes, y se van a
 seguir sumando features nuevas en conjunto con el uso diario — no asumas
 que el alcance está cerrado en lo ya construido.
 
-Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
-o seguir acercando Data Center al feature-set de Notion (dashboard de
-Inicio, hoy un placeholder) según lo que el usuario pida a medida que lo
-usa.
+Próximo paso: Fase 4 (personalización: temas, layout de widgets del
+dashboard de Inicio, reportes) según lo que el usuario pida a medida que
+lo usa. Ya no quedan módulos placeholder — de acá en más es refinar lo
+construido o sumar features nuevas que el usuario pida sobre la marcha.
