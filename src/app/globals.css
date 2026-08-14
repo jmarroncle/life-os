@@ -1,28 +1,63 @@
 @import "tailwindcss";
 
-/*
- * Life OS todavía no tiene modo oscuro (queda para la Fase 4,
- * personalización). A propósito NO hay una media query de
- * prefers-color-scheme acá: el create-next-app default la traía y
- * generaba un fondo negro por atrás peleando con el tema claro del resto
- * de la app (sidebar blanca, cards blancas) — un lío visual. Cuando se
- * construya el modo oscuro real, se hace con un toggle explícito, no con
- * la preferencia del sistema.
- */
-:root {
-  --background: #fafafa;
-  --foreground: #171717;
-  color-scheme: light;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * Modo oscuro: togglea el atributo data-theme="dark" en <html> (ver
+ * ThemeToggle y el script inline en layout.tsx que lo aplica antes del
+ * primer paint, para no tener flash de tema claro). A propósito NO hay
+ * una media query de prefers-color-scheme: el toggle es explícito,
+ * elegido por el usuario y persistido en localStorage — no la preferencia
+ * del sistema. El create-next-app default traía esa media query y
+ * generaba un fondo negro peleando con el tema claro del resto de la
+ * app; no la reintroduzcas.
+ *
+ * La implementación NO usa el variant `dark:` de Tailwind ni retoca cada
+ * componente uno por uno. En cambio, redefine acá las custom properties
+ * que Tailwind v4 ya usa internamente para sus utilidades de color —
+ * confirmado leyendo el CSS compilado:
+ * `.bg-neutral-50{background-color:var(--color-neutral-50)}`. Como toda
+ * la UI de la app usa la escala `neutral-*` de forma consistente (número
+ * más alto = más oscuro en el tema claro), invertir la escala completa
+ * bajo [data-theme="dark"] resuelve automáticamente cards, bordes, texto
+ * y hovers de TODA la app sin tocar un solo componente. Los acentos de
+ * color (blue/green/red) no se invierten — se eligen variantes más
+ * claras/saturadas para tener contraste sobre fondo oscuro.
+ *
+ * Si en algún componente nuevo hace falta un color que no está en esta
+ * lista, agregalo acá (mismo patrón) en vez de escribir clases `dark:`
+ * sueltas — mantiene el modo oscuro centralizado en un solo lugar.
+ */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-neutral-50: oklch(20.5% 0 none);
+  --color-neutral-100: oklch(26.9% 0 none);
+  --color-neutral-200: oklch(37.1% 0 none);
+  --color-neutral-300: oklch(43.9% 0 none);
+  --color-neutral-400: oklch(55.6% 0 none);
+  --color-neutral-500: oklch(70.8% 0 none);
+  --color-neutral-600: oklch(87% 0 none);
+  --color-neutral-700: oklch(92.2% 0 none);
+  --color-neutral-900: oklch(98.5% 0 none);
+  --color-white: oklch(26.9% 0 none);
+
+  --color-blue-50: oklch(28.2% 0.091 267.935);
+  --color-blue-300: oklch(70.7% 0.165 254.624);
+  --color-blue-600: oklch(70.7% 0.165 254.624);
+  --color-green-700: oklch(79.2% 0.209 151.711);
+  --color-red-500: oklch(70.4% 0.191 22.216);
+  --color-red-600: oklch(70.4% 0.191 22.216);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-900);
 }

@@ -19,6 +19,9 @@ personal / experimento, código abierto.
   PWA instalable para captura desde cualquier dispositivo.
 - **Finanzas**: cuentas, movimientos, categorías, presupuestos y dashboard
   de gasto.
+- **Reportes**: tendencia de ingresos/gastos de los últimos 6 meses,
+  categorías con más gasto del período y estadísticas de productividad
+  (tareas por estado, cantidad de páginas y notas).
 - **Foco**: timer Pomodoro configurable + fondos ambientales (presets de
   color o tu propio embed de playlist/video), combinables en una "sesión de
   foco".
@@ -56,7 +59,12 @@ personal / experimento, código abierto.
   subpáginas (una "carpeta" es simplemente una página con hijas, igual que
   en Notion) — árbol expandible/colapsable en `/data-center`, breadcrumb y
   sección de subpáginas dentro de cada página.
-- **Fase 4**: personalización (temas, layout de widgets), reportes.
+- **Fase 4 (hecho)**: modo oscuro (toggle explícito, persistido en
+  localStorage), dashboard de Inicio personalizable (mostrar/ocultar y
+  reordenar widgets) y **Reportes** — nuevo módulo con tendencia de
+  ingresos/gastos de los últimos 6 meses, categorías con más gasto del
+  período y estadísticas de productividad (tareas por estado, cantidad de
+  páginas y notas).
 
 ## Desarrollo local
 
@@ -128,6 +136,22 @@ o falta la policy de `insert`).
 
 ## Notas técnicas
 
+- **Modo oscuro**: toggle explícito en el sidebar (`theme-toggle.tsx`),
+  persistido en `localStorage` (`life-os:theme`) y aplicado como
+  `data-theme="dark"` en `<html>`. Un script inline al principio del
+  `<body>` (`layout.tsx`) aplica el tema guardado antes del primer paint,
+  para no flashear el tema claro. La implementación NO usa el variant
+  `dark:` de Tailwind ni retoca componente por componente: redefine en
+  `globals.css`, bajo `[data-theme="dark"]`, las custom properties que
+  Tailwind v4 ya usa internamente para sus utilidades de color
+  (`--color-neutral-*`, `--color-white`, etc. — confirmado leyendo el CSS
+  compilado, que referencia `var(--color-neutral-50)` en vez de un valor
+  fijo). Como toda la app usa la escala `neutral-*` de forma consistente,
+  invertirla completa resuelve cards, bordes, texto y hovers de toda la
+  UI sin tocar un solo componente; los acentos de color (blue/green/red)
+  se ajustan a variantes con contraste sobre fondo oscuro en vez de
+  invertirse. Si agregás un color nuevo a algún componente, sumale su
+  equivalente oscuro en ese mismo bloque de `globals.css`.
 - Next.js 16 renombró `middleware.ts` a `proxy.ts` — vive en `src/proxy.ts`
   (no en la raíz) por usar `--src-dir`. Se encarga de refrescar la sesión
   de Supabase y redirigir a `/login` si no hay usuario.
@@ -192,6 +216,18 @@ o falta la policy de `insert`).
   signo: positivo = ingreso, negativo = gasto) para no arrastrar errores de
   punto flotante. Se asume una sola moneda (ARS por defecto en `accounts`);
   no hay conversión entre monedas.
+- **Dashboard de Inicio personalizable** (`dashboard-widgets.tsx`):
+  mostrar/ocultar cada widget y reordenarlos con botones ↑/↓ (no
+  drag-and-drop acá — con 6 widgets alcanza y sobra, no vale la pena
+  reimplementar el patrón nativo de `page-tree.tsx` para una lista tan
+  corta). Preferencia en `localStorage` (`life-os:dashboard-widgets`,
+  `{ order, hidden }`); el server component (`page.tsx`) sigue trayendo
+  los datos de cada módulo en paralelo, el cliente solo decide qué mostrar
+  y en qué orden.
+- **Reportes** (`/reportes`) no agrega tablas nuevas: agrega datos ya
+  existentes de `transactions` (tendencia mensual y categorías, agrupando
+  por `to_char(occurred_at, 'YYYY-MM')`) y cuenta filas de `tasks` por
+  estado, `pages` y `notes`. Rango fijo de 6 meses (`MONTHS_BACK`).
 - **Foco** no trae una playlist de jazz ni un video de yoga precargados a
   propósito — el link de un video o playlist específico no es información
   que se pueda inventar de forma confiable (puede no existir, cambiar o no

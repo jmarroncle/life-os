@@ -12,6 +12,27 @@ roadmap por fases.
 - **Stack**: Next.js 16 (App Router) + Supabase (Postgres/Auth/Storage) +
   Drizzle ORM + Tailwind v4, deploy en Vercel.
 - **Auth**: solo magic link (sin password). Un único usuario por ahora.
+- **Modo oscuro: variables CSS globales, no `dark:` por componente**: el
+  toggle (`theme-toggle.tsx`) pone `data-theme="dark"` en `<html>` y lo
+  persiste en `localStorage` (`life-os:theme`); un script inline al
+  principio del `<body>` en `layout.tsx` lo aplica antes del primer paint
+  (evita el flash de tema claro). La implementación NO agrega clases
+  `dark:` en cada componente — redefine en `globals.css`, bajo
+  `[data-theme="dark"]`, las custom properties que Tailwind v4 usa
+  internamente para sus utilidades de color (verificado en el CSS
+  compilado: `.bg-neutral-50{background-color:var(--color-neutral-50)}`,
+  no un valor fijo). Como la escala `neutral-*` se usa en toda la app de
+  forma consistente (número más alto = más oscuro en claro), invertirla
+  completa resuelve automáticamente cards/bordes/texto/hovers de TODA la
+  UI sin tocar un componente. Los acentos (`blue-*`, `green-700`,
+  `red-*`) no se invierten — se mapean a variantes con contraste
+  adecuado sobre fondo oscuro. **Si agregás un color Tailwind nuevo a
+  algún componente, sumale su equivalente oscuro en ese mismo bloque de
+  `globals.css` — no escribas `dark:` sueltos, rompe el patrón y hay que
+  mantenerlo en dos lugares.** Limitación conocida: el contenido del
+  editor de bloques (Yoopta) hereda `color` del DOM así que el texto
+  respeta el tema, pero el resaltado de sintaxis de `@yoopta/code`
+  (Shiki) no se probó en oscuro — no es parte de esta escala.
 - **Editor de bloques**: **Yoopta-Editor** (MIT, sobre Slate.js, exporta a
   Markdown/HTML), instalado en Fase 1. Componente reutilizable en
   `src/components/block-editor.tsx`. Plugins: paragraph, headings, lists,
@@ -144,6 +165,23 @@ roadmap por fases.
   directo a `accounts.google.com` / `oauth2.googleapis.com`), independiente
   de cualquier conector de Google que uses vos como usuario en Claude. Solo
   scope `calendar.readonly`, sin escritura.
+- **Dashboard de Inicio: mostrar/ocultar y reordenar, sin drag-and-drop**:
+  `dashboard-widgets.tsx` guarda `{ order, hidden }` en `localStorage`
+  (`life-os:dashboard-widgets`) y reordena con botones ↑/↓, no arrastre —
+  con 6 widgets fijos no vale la pena reimplementar el patrón nativo de
+  `page-tree.tsx` para una lista tan corta. `page.tsx` (Server Component)
+  sigue trayendo los datos de cada módulo en paralelo; el cliente solo
+  decide qué widget mostrar y en qué orden, nunca vuelve a pedir datos.
+- **Reportes es un módulo nuevo, no una pestaña de Finanzas**: aunque la
+  mayoría de sus datos vienen de `transactions`, también agrega
+  `tasks`/`pages`/`notes` (productividad) — por eso es su propia entrada
+  de sidebar (`/reportes`) en vez de una tab más dentro de Finanzas. No
+  agrega tablas: `reportes/actions.ts` agrupa `transactions` por
+  `to_char(occurred_at, 'YYYY-MM')` para la tendencia mensual y cuenta
+  filas de `tasks`/`pages`/`notes` para productividad. Rango fijo de 6
+  meses (constante `MONTHS_BACK` en `page.tsx`, parámetro `monthsBack` en
+  las actions) — no hay selector de rango todavía, sumalo si el usuario
+  lo pide.
 
 ## Convenciones de Next.js 16 en este repo (releer antes de tocar código)
 
@@ -159,7 +197,7 @@ roadmap por fases.
 ## Estructura
 
 - `src/app/(app)/` — rutas protegidas por `proxy.ts`, con el layout del
-  sidebar (Inicio, Data Center, Libreta, Finanzas, Foco).
+  sidebar (Inicio, Data Center, Libreta, Finanzas, Reportes, Foco).
   - `page.tsx` (Inicio) es un dashboard de solo lectura: agrega datos de
     todos los demás módulos en paralelo (`Promise.all`) — tareas
     pendientes (`data-center/tareas/actions`), resumen del mes
@@ -170,7 +208,11 @@ roadmap por fases.
     `google_calendar_connections`, muestra un link para conectar en vez de
     intentar llamar a la API). No tiene lógica propia ni tablas nuevas,
     solo lee y linkea a cada sección — no le agregues acciones de
-    escritura acá, van en el módulo correspondiente.
+    escritura acá, van en el módulo correspondiente. El layout de widgets
+    (mostrar/ocultar, reordenar) lo maneja `DashboardWidgets`
+    (`src/components/dashboard-widgets.tsx`), un Client Component que
+    recibe los datos ya resueltos como props — `page.tsx` no sabe nada de
+    la preferencia del usuario, ver Decisiones.
   - `data-center/` tiene su propio layout con tabs (Páginas/Tareas/
     Calendario/Generar con IA): `data-center/page.tsx` (árbol de páginas,
     ver `src/components/page-tree.tsx`), `data-center/paginas/[id]/`
@@ -184,6 +226,10 @@ roadmap por fases.
     Categorías/Presupuestos). `finanzas/actions.ts` tiene lo compartido
     (cuentas, categorías, `getMonthSummary`); cada subcarpeta con lógica
     propia tiene su propio `actions.ts` (`movimientos/`, `presupuestos/`).
+  - `reportes/page.tsx` + `reportes/actions.ts` (`getMonthlyTrend`,
+    `getCategoryTotals`, `getProductivityStats`) — sin layout de tabs, una
+    sola página. Ver Decisiones para por qué es su propio módulo y no una
+    tab de Finanzas.
   - `foco/page.tsx` combina `PomodoroTimer` + `FocusAmbience` (los dos
     solo-cliente, sin DB — todo en localStorage).
 - `src/app/login/` y `src/app/auth/callback/` — fuera del grupo `(app)`,
@@ -241,7 +287,10 @@ roadmap por fases.
   — timer con settings persistidos en localStorage. `focus-ambience.tsx`
   — presets de color + embeds de audio/video personalizables, todo en
   localStorage (ver Decisiones). `generate-doc-form.tsx` — form de
-  generación de docs con IA.
+  generación de docs con IA. `theme-toggle.tsx` — toggle de modo
+  oscuro/claro, persistido en localStorage (ver Decisiones).
+  `dashboard-widgets.tsx` — mostrar/ocultar y reordenar los widgets de
+  Inicio, persistido en localStorage (ver Decisiones).
 
 ## Patrón de server actions (seguir en todo lo nuevo)
 
@@ -252,20 +301,25 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 ## Estado actual
 
-Fase 1, Fase 2 y Fase 3 completas: Inicio (dashboard agregando datos de
-todos los módulos), Data Center (páginas con jerarquía tipo Notion
-—reparentar arrastrando una página sobre otra, ícono/emoji por página—,
-tareas, calendario, generación de docs con IA, PRs), Libreta, Pomodoro,
-Finanzas, Foco. Editor de bloques con barra flotante, menú `/`, imágenes
-(Supabase Storage), tablas, y acciones flotantes por bloque
-("+"/arrastrar-reordenar/duplicar/eliminar). Build y lint verificados en
-cada paso; NO se pudo probar en runtime contra Supabase real ni contra las
-APIs de GitHub/Google/Anthropic desde el sandbox donde se armó (red
-bloqueada a la mayoría de los dominios externos) — probar en local o
-Vercel antes de asumir que algo funciona end-to-end. Las seis migraciones
-SQL todavía no se corrieron en Supabase (ver README → Base de datos), el
-bucket de Storage tampoco (ver README → Storage,
-`supabase/storage-setup.sql`), y
+Fases 1 a 4 completas. Inicio (dashboard agregando datos de todos los
+módulos, con widgets que se pueden mostrar/ocultar y reordenar), Data
+Center (páginas con jerarquía tipo Notion —reparentar arrastrando una
+página sobre otra, ícono/emoji por página—, tareas, calendario,
+generación de docs con IA, PRs), Libreta, Finanzas, **Reportes**
+(tendencia mensual, categorías con más gasto, productividad), Foco.
+Editor de bloques con barra flotante, menú `/`, imágenes (Supabase
+Storage), tablas, y acciones flotantes por bloque
+("+"/arrastrar-reordenar/duplicar/eliminar). Modo oscuro con toggle
+explícito. Build y lint verificados en cada paso; NO se pudo probar en
+runtime contra Supabase real ni contra las APIs de GitHub/Google/Anthropic
+desde el sandbox donde se armó (red bloqueada a la mayoría de los
+dominios externos) — probar en local o Vercel antes de asumir que algo
+funciona end-to-end, y en particular **probar el modo oscuro visualmente**
+(la técnica de variables CSS globales no se pudo verificar en un browser
+real desde acá, solo se confirmó que el CSS compila con los valores
+esperados). Las seis migraciones SQL todavía no se corrieron en Supabase
+(ver README → Base de datos), el bucket de Storage tampoco (ver README →
+Storage, `supabase/storage-setup.sql`), y
 `GITHUB_TOKEN`/`ANTHROPIC_API_KEY`/`GOOGLE_CLIENT_ID`+`GOOGLE_CLIENT_SECRET`
 todavía no están configuradas (ver README y `.env.local.example`).
 
@@ -274,7 +328,10 @@ todas las features clave de Notion tienen que estar presentes, y se van a
 seguir sumando features nuevas en conjunto con el uso diario — no asumas
 que el alcance está cerrado en lo ya construido.
 
-Próximo paso: Fase 4 (personalización: temas, layout de widgets del
-dashboard de Inicio, reportes) según lo que el usuario pida a medida que
-lo usa. Ya no quedan módulos placeholder — de acá en más es refinar lo
-construido o sumar features nuevas que el usuario pida sobre la marcha.
+No queda ningún ítem de roadmap pendiente de las fases originales. Próximo
+paso: lo que el usuario pida sobre la marcha a medida que usa la app.
+Ideas ya identificadas pero explícitamente NO implementadas (no las
+sumes sin que el usuario lo pida): selector de rango de fechas en
+Reportes (hoy fijo a 6 meses), acentos de color custom más allá de
+claro/oscuro, drag-and-drop de filas/columnas dentro de una tabla del
+editor.

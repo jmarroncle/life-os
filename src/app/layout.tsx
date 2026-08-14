@@ -25,6 +25,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-neutral-50 font-sans text-neutral-900">
+        {/* Aplica el tema guardado antes del primer paint, para no flashear
+            el tema claro y después saltar a oscuro. Script bloqueante a
+            propósito (sin async/defer) — corre durante el parseo del HTML,
+            antes de que el navegador pinte el resto del body. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("life-os:theme")==="dark"){document.documentElement.dataset.theme="dark"}}catch(e){}`,
+          }}
+        />
         {children}
       </body>
     </html>

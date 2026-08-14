@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/data-center", label: "Data Center" },
   { href: "/libreta", label: "Libreta" },
   { href: "/finanzas", label: "Finanzas" },
+  { href: "/reportes", label: "Reportes" },
   { href: "/foco", label: "Foco" },
 ];
 

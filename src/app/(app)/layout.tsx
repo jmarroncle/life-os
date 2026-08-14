@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const supabase = await createClient();
@@ -16,11 +17,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </p>
           <SidebarNav />
         </div>
-        {user && (
-          <p className="truncate border-t border-neutral-100 px-2.5 pt-3 text-xs text-neutral-400">
-            {user.email}
-          </p>
-        )}
+        <div className="border-t border-neutral-100 pt-2">
+          <ThemeToggle />
+          {user && (
+            <p className="truncate px-2.5 pt-1 text-xs text-neutral-400">
+              {user.email}
+            </p>
+          )}
+        </div>
       </aside>
       <main className="flex-1 overflow-y-auto p-8">
         <div className="mx-auto max-w-3xl">{children}</div>
