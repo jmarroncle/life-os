@@ -4,6 +4,54 @@ Plataforma personal de productividad — un "Notion propio" con tareas, notas,
 finanzas y foco, pensada para uso diario de un solo usuario. Proyecto
 personal / experimento, código abierto.
 
+## Arquitectura
+
+Una sola base de datos (Supabase/Postgres) detrás de dos puertas de entrada:
+la app web de siempre, y un servidor MCP para operar todo desde un chat.
+
+```mermaid
+flowchart TB
+    user(("👤 Un solo usuario"))
+
+    subgraph entradas [" "]
+        direction LR
+        browser["🌐 Browser<br/>Next.js App Router"]
+        chat["💬 Chat (claude.ai / Claude Desktop / Claude Code)<br/>vía MCP + OAuth 2.1"]
+    end
+
+    user --> browser
+    user --> chat
+
+    subgraph modulos ["Life OS · módulos"]
+        direction LR
+        datacenter["📁 Data Center<br/><sub>páginas anidadas, tareas, calendario, docs con IA</sub>"]
+        bases["🗄️ Bases de datos<br/><sub>colecciones con columnas tipadas</sub>"]
+        libreta["📓 Libreta<br/><sub>notas + tags</sub>"]
+        finanzas["💰 Finanzas<br/><sub>cuentas, movimientos, presupuestos</sub>"]
+        reportes["📊 Reportes"]
+        foco["⏱️ Foco<br/><sub>Pomodoro</sub>"]
+    end
+
+    mcpserver["🔌 /api/mcp<br/><sub>19 tools · Streamable HTTP</sub>"]
+
+    browser --> modulos
+    chat --> mcpserver --> modulos
+
+    db[("🐘 Supabase<br/>Postgres + Auth<br/>schema life_os")]
+    modulos --> db
+
+    classDef entry fill:#eef2ff,stroke:#6366f1,color:#312e81;
+    classDef module fill:#ecfdf5,stroke:#10b981,color:#064e3b;
+    classDef store fill:#1e293b,stroke:#0f172a,color:#f8fafc;
+    class browser,chat entry;
+    class datacenter,bases,libreta,finanzas,reportes,foco,mcpserver module;
+    class db store;
+```
+
+Las dos puertas (browser y chat) terminan en el mismo lugar: no hay datos
+"solo para MCP" ni "solo para la app" — crear una tarea por chat la deja
+visible al toque en `/data-center/tareas`, y viceversa.
+
 ## Módulos
 
 - **Inicio**: dashboard del día — tareas pendientes, resumen financiero del
