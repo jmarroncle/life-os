@@ -28,9 +28,11 @@ personal / experimento, código abierto.
   MIT, construido sobre Slate.js, exporta a Markdown/HTML. Soporta atajos
   tipo markdown (`# `, `## `, `- `, etc.) y de teclado (`Cmd+B`, `Cmd+I`, …),
   además de la barra flotante (al seleccionar texto: negrita, itálica,
-  subrayado, tachado, código) y el menú `/` (para insertar o convertir el
-  bloque actual, incluidas imágenes y tablas) de `@yoopta/ui`. Las imágenes
-  se suben a Supabase Storage (ver Storage más abajo).
+  subrayado, tachado, código), el menú `/` (para insertar o convertir el
+  bloque actual, incluidas imágenes y tablas) y las acciones flotantes por
+  bloque (al pasar el mouse: agregar bloque debajo, duplicar, eliminar) de
+  `@yoopta/ui`. Las imágenes se suben a Supabase Storage (ver Storage más
+  abajo).
 
 ## Roadmap
 
@@ -150,11 +152,16 @@ o falta la policy de `insert`).
   bien al tipo genérico que espera `createYooptaEditor`), no afecta el
   comportamiento en runtime.
 - `@yoopta/ui` está integrado para `FloatingToolbar` (marks al seleccionar
-  texto) y `SlashCommandMenu` (menú `/` para insertar/convertir bloques) —
-  ver `block-editor-toolbar.tsx` y `block-editor-slash-menu.tsx`. Son
-  componentes compuestos (patrón Root/Content/Item, no un drop-in) que se
-  montan como `children` de `<YooptaEditor>`. `FloatingBlockActions`
-  (drag handle + menú "..." por bloque) todavía no está integrado.
+  texto), `SlashCommandMenu` (menú `/` para insertar/convertir bloques) y
+  `FloatingBlockActions` + `BlockOptions` (al pasar el mouse sobre un
+  bloque: "+" para agregar uno debajo, "⠿" abre un menú con Duplicar/
+  Eliminar) — ver `block-editor-toolbar.tsx`, `block-editor-slash-menu.tsx`
+  y `block-editor-block-actions.tsx`. Son componentes compuestos (patrón
+  Root/Content/Item, no un drop-in) que se montan como `children` de
+  `<YooptaEditor>`. El drag handle todavía no soporta arrastrar para
+  reordenar bloques (eso es `@yoopta/ui/block-dnd`, un paquete aparte con
+  su propia integración vía `renderBlock`) — por ahora solo abre el menú
+  de opciones.
 - Todas las queries a la base pasan por Drizzle con conexión directa a
   Postgres (`DATABASE_URL`), no por la REST API de Supabase — o sea que las
   políticas de RLS (si algún día se agregan) NO protegen estas tablas. Cada

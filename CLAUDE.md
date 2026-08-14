@@ -16,21 +16,31 @@ roadmap por fases.
   Markdown/HTML), instalado en Fase 1. Componente reutilizable en
   `src/components/block-editor.tsx`. Plugins: paragraph, headings, lists,
   blockquote, code, link, divider, marks, **image**, **table**.
-  `@yoopta/ui` (barra flotante de marks al seleccionar texto + menú `/`
-  para insertar/convertir bloques) está integrado:
-  `block-editor-toolbar.tsx` y `block-editor-slash-menu.tsx`, renderizados
-  como `children` de `<YooptaEditor>` (así reciben el contexto vía
-  `useYooptaEditor()`, igual que hace la librería internamente). Son
-  componentes compuestos (Root/Content/Item), no drop-in — los ítems del
-  menú `/` llaman `editor.toggleBlock(<TypeKey>, { focus: true })` para
-  bloques de texto (con la key PascalCase de cada plugin: `Paragraph`,
-  `HeadingOne`, `BulletedList`, etc., no el tipo de elemento Slate en
-  minúscula) o los comandos dedicados `ImageCommands.insertImage` /
-  `TableCommands.insertTable` para imagen/tabla. Se desactivan cuando
+  `@yoopta/ui` (barra flotante de marks al seleccionar texto, menú `/`
+  para insertar/convertir bloques, y acciones flotantes por bloque al
+  pasar el mouse) está integrado: `block-editor-toolbar.tsx`,
+  `block-editor-slash-menu.tsx` y `block-editor-block-actions.tsx`,
+  renderizados como `children` de `<YooptaEditor>` (así reciben el
+  contexto vía `useYooptaEditor()`, igual que hace la librería
+  internamente). Son componentes compuestos (Root/Content/Item), no
+  drop-in — los ítems del menú `/` llaman `editor.toggleBlock(<TypeKey>, {
+  focus: true })` para bloques de texto (con la key PascalCase de cada
+  plugin: `Paragraph`, `HeadingOne`, `BulletedList`, etc., no el tipo de
+  elemento Slate en minúscula) o los comandos dedicados
+  `ImageCommands.insertImage` / `TableCommands.insertTable` para
+  imagen/tabla. Las acciones por bloque usan `FloatingBlockActions` (de
+  `@yoopta/ui/floating-block-actions`) para el "+"/"⠿" y `BlockOptions` +
+  `useBlockActions()` (de `@yoopta/ui/block-options`) para el menú
+  Duplicar/Eliminar — `useBlockActions` ya trae `duplicateBlock`/
+  `deleteBlock`/`copyBlockLink` implementados, no hace falta reimplementarlos
+  a mano. El drag handle ("⠿") solo abre el menú, todavía no soporta
+  arrastrar para reordenar (eso requiere `@yoopta/ui/block-dnd` +
+  `renderBlock` en `<YooptaEditor>`, una integración más grande, no
+  sumada sin que el usuario lo pida). Todo esto se desactiva cuando
   `readOnly` es `true`. No se agregó `lucide-react` (no está hoisted en
   node_modules, es una dependencia interna de `@yoopta/ui`) — los botones
-  usan texto plano (B/I/U/S) para no sumar una dependencia nueva solo por
-  íconos.
+  usan texto plano (B/I/U/S, +, ⠿) para no sumar una dependencia nueva
+  solo por íconos.
 - **Imágenes → Supabase Storage**: `src/lib/uploads.ts` (`"use server"`)
   expone `uploadBlockImage(file)`, usado por el plugin `@yoopta/image` vía
   un wrapper client-side en `yoopta-plugins.ts` (`handleImageUpload`) que
@@ -165,9 +175,11 @@ roadmap por fases.
   `src/db/migrations/`) todavía no se aplicaron en Supabase (ver README →
   Base de datos).
 - `src/components/block-editor.tsx` — wrapper de Yoopta, monta
-  `block-editor-toolbar.tsx` (barra flotante de marks) y
-  `block-editor-slash-menu.tsx` (menú `/` de bloques) como children.
-  `entity-editor.tsx` — título + editor + autosave debounced (800ms),
+  `block-editor-toolbar.tsx` (barra flotante de marks),
+  `block-editor-slash-menu.tsx` (menú `/` de bloques) y
+  `block-editor-block-actions.tsx` (acciones "+"/"⠿" al pasar el mouse
+  sobre un bloque) como children. `entity-editor.tsx` — título + editor +
+  autosave debounced (800ms),
   reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
   `page-tree.tsx` — árbol recursivo de páginas (expandir/colapsar,
   resaltado de página activa, "+" para crear subpágina inline), usado en
@@ -190,10 +202,11 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas con jerarquía tipo
 Notion, tareas, calendario, generación de docs con IA, PRs), Libreta,
 Pomodoro, Finanzas, Foco. Editor de bloques con barra flotante, menú `/`,
-imágenes (Supabase Storage) y tablas. Build y lint verificados en cada
-paso; NO se pudo probar en runtime contra Supabase real ni contra las APIs
-de GitHub/Google/Anthropic desde el sandbox donde se armó (red bloqueada a
-la mayoría de los dominios externos) — probar en local o Vercel antes de
+imágenes (Supabase Storage), tablas y acciones flotantes por bloque
+("+"/duplicar/eliminar). Build y lint verificados en cada paso; NO se pudo
+probar en runtime contra Supabase real ni contra las APIs de
+GitHub/Google/Anthropic desde el sandbox donde se armó (red bloqueada a la
+mayoría de los dominios externos) — probar en local o Vercel antes de
 asumir que algo funciona end-to-end. Las cinco migraciones SQL todavía no
 se corrieron en Supabase (ver README → Base de datos), el bucket de
 Storage tampoco (ver README → Storage, `supabase/storage-setup.sql`), y
@@ -206,8 +219,7 @@ seguir sumando features nuevas en conjunto con el uso diario — no asumas
 que el alcance está cerrado en lo ya construido.
 
 Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
-o seguir acercando Data Center al feature-set de Notion
-(`FloatingBlockActions` de `@yoopta/ui` — drag handle + menú "..." por
-bloque, mover páginas de padre por drag-and-drop o selector, íconos/emoji
-por página, dashboard de Inicio) según lo que el usuario pida a medida que
-lo usa.
+o seguir acercando Data Center al feature-set de Notion (drag-and-drop
+real para reordenar bloques vía `@yoopta/ui/block-dnd`, mover páginas de
+padre por drag-and-drop o selector, íconos/emoji por página, dashboard de
+Inicio) según lo que el usuario pida a medida que lo usa.

@@ -8,6 +8,7 @@ import YooptaEditor, {
 import { plugins, marks } from "@/lib/yoopta-plugins";
 import { BlockEditorToolbar } from "@/components/block-editor-toolbar";
 import { BlockEditorSlashMenu } from "@/components/block-editor-slash-menu";
+import { BlockEditorBlockActions } from "@/components/block-editor-block-actions";
 
 export type { YooptaContentValue };
 
@@ -43,6 +44,7 @@ export function BlockEditor({
         <>
           <BlockEditorToolbar />
           <BlockEditorSlashMenu />
+          <BlockEditorBlockActions />
         </>
       )}
     </YooptaEditor>
