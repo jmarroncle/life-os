@@ -54,6 +54,37 @@ export async function updatePage(
     .where(and(eq(pages.id, id), eq(pages.userId, user.id)));
 }
 
+export async function movePage(id: string, newParentId: string | null) {
+  const user = await requireUser();
+
+  if (newParentId === id) {
+    throw new Error("Una página no puede ser su propio padre.");
+  }
+
+  if (newParentId) {
+    const userPages = await db
+      .select({ id: pages.id, parentId: pages.parentId })
+      .from(pages)
+      .where(eq(pages.userId, user.id));
+    const parentById = new Map(userPages.map((p) => [p.id, p.parentId]));
+
+    let ancestor: string | null = newParentId;
+    while (ancestor) {
+      if (ancestor === id) {
+        throw new Error(
+          "No se puede mover una página dentro de una de sus propias subpáginas.",
+        );
+      }
+      ancestor = parentById.get(ancestor) ?? null;
+    }
+  }
+
+  await db
+    .update(pages)
+    .set({ parentId: newParentId, updatedAt: new Date() })
+    .where(and(eq(pages.id, id), eq(pages.userId, user.id)));
+}
+
 export async function deletePage(id: string) {
   const user = await requireUser();
   const [deleted] = await db

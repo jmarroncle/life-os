@@ -7,7 +7,8 @@ personal / experimento, código abierto.
 ## Módulos
 
 - **Data Center**: páginas tipo Notion (editor de bloques, con subpáginas
-  anidadas — árbol de páginas/carpetas sin límite de profundidad) + tareas
+  anidadas — árbol de páginas/carpetas sin límite de profundidad,
+  reordenable arrastrando una página sobre otra o al nivel raíz) + tareas
   tipo Asana (proyectos, estados) + calendario de Google + generación de
   docs técnicas con IA + creación de PRs desde una tarea.
 - **Libreta**: notas rápidas tipo journal, con tags y buscador. Pensada como
@@ -163,6 +164,16 @@ o falta la policy de `insert`).
   `BlockEditor` (`block-editor.tsx`): envuelve todo en `BlockDndContext` y
   usa `renderBlock` para envolver cada bloque en `SortableBlock`; el "⠿"
   es el `DragHandle` que dispara el arrastre.
+- El árbol de páginas (`page-tree.tsx`) también tiene drag-and-drop, pero
+  para reparentar páginas (no para reordenar bloques) — usa la API nativa
+  de HTML5 del navegador (`draggable`, eventos `onDragStart/Over/Drop`),
+  no `@dnd-kit`. Soltar una página sobre otra la convierte en subpágina;
+  una zona punteada aparte ("Soltar acá para mover al nivel raíz", visible
+  solo mientras hay un drag en curso) la vuelve top-level. La acción
+  `movePage` valida ciclos en el servidor (no se puede mover una página
+  dentro de sí misma o de una de sus propias subpáginas) y la UI también
+  bloquea esos drops visualmente. No soporta touch ni teclado — aceptable
+  para un uso mayormente de escritorio.
 - Todas las queries a la base pasan por Drizzle con conexión directa a
   Postgres (`DATABASE_URL`), no por la REST API de Supabase — o sea que las
   políticas de RLS (si algún día se agregan) NO protegen estas tablas. Cada

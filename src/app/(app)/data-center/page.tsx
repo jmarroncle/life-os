@@ -1,4 +1,4 @@
-import { createPage, listPages } from "./actions";
+import { createPage, listPages, movePage } from "./actions";
 import { PageTree } from "@/components/page-tree";
 
 export default async function DataCenterPaginasPage() {
@@ -21,7 +21,7 @@ export default async function DataCenterPaginasPage() {
         </button>
       </form>
 
-      <PageTree items={items} createPage={createPage} />
+      <PageTree initialItems={items} createPage={createPage} movePage={movePage} />
     </div>
   );
 }

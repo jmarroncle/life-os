@@ -110,6 +110,23 @@ roadmap por fases.
   tags+buscador, porque es un cuaderno de captura rápida tipo journal, no
   un wiki jerárquico. No le agregues jerarquía a `notes` sin que el
   usuario lo pida.
+- **Mover páginas de padre: drag-and-drop nativo, no `@dnd-kit`**:
+  `page-tree.tsx` (el árbol de `/data-center`) implementa el reparent con
+  la API nativa de HTML5 (`draggable`, `onDragStart/Over/Drop`), no con
+  `@dnd-kit` como el drag-and-drop de bloques del editor — acá alcanza con
+  eventos nativos porque no hace falta reordenar posiciones ni animar
+  overlays, solo reasignar `parentId` al soltar. Soltar una página SOBRE
+  otra la convierte en subpágina; una zona punteada aparte ("Soltar acá
+  para mover al nivel raíz", solo visible mientras hay un drag en curso)
+  la vuelve top-level. `movePage(id, newParentId)` en `data-center/
+  actions.ts` valida ciclos (no se puede soltar una página sobre sí misma
+  ni sobre una de sus propias subpáginas) recorriendo la cadena de
+  ancestros del destino antes de escribir — la UI también bloquea
+  visualmente esos drops (calculando los descendientes de la página
+  arrastrada) para no depender solo del error del servidor. Limitación
+  conocida: drag-and-drop nativo no soporta touch ni teclado — aceptable
+  para un árbol de páginas de uso mayormente de escritorio, no le sumes
+  `@dnd-kit` acá sin que el usuario lo pida.
 - **Google Calendar: OAuth propio, no el conector de la sesión de agente**:
   `src/lib/google-calendar.ts` implementa el flow de OAuth2 a mano (fetch
   directo a `accounts.google.com` / `oauth2.googleapis.com`), independiente
@@ -191,8 +208,10 @@ roadmap por fases.
   autosave debounced (800ms),
   reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
   `page-tree.tsx` — árbol recursivo de páginas (expandir/colapsar,
-  resaltado de página activa, "+" para crear subpágina inline), usado en
-  `data-center/page.tsx`. `task-board.tsx` — tablero de tareas con estado
+  resaltado de página activa, "+" para crear subpágina inline, drag-and-drop
+  nativo para reparentar arrastrando una página sobre otra o al nivel
+  raíz), usado en `data-center/page.tsx`. `task-board.tsx` — tablero de
+  tareas con estado
   optimista en cliente + botón "Crear PR" por tarea. `pomodoro-timer.tsx`
   — timer con settings persistidos en localStorage. `focus-ambience.tsx`
   — presets de color + embeds de audio/video personalizables, todo en
@@ -209,9 +228,10 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 ## Estado actual
 
 Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas con jerarquía tipo
-Notion, tareas, calendario, generación de docs con IA, PRs), Libreta,
-Pomodoro, Finanzas, Foco. Editor de bloques con barra flotante, menú `/`,
-imágenes (Supabase Storage), tablas, y acciones flotantes por bloque
+Notion —incluido reparentar arrastrando una página sobre otra—, tareas,
+calendario, generación de docs con IA, PRs), Libreta, Pomodoro, Finanzas,
+Foco. Editor de bloques con barra flotante, menú `/`, imágenes (Supabase
+Storage), tablas, y acciones flotantes por bloque
 ("+"/arrastrar-reordenar/duplicar/eliminar). Build y lint verificados en
 cada paso; NO se pudo probar en runtime contra Supabase real ni contra las
 APIs de GitHub/Google/Anthropic desde el sandbox donde se armó (red
@@ -229,7 +249,6 @@ seguir sumando features nuevas en conjunto con el uso diario — no asumas
 que el alcance está cerrado en lo ya construido.
 
 Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
-o seguir acercando Data Center al feature-set de Notion (mover páginas de
-padre por drag-and-drop o selector en `page-tree.tsx`, íconos/emoji por
+o seguir acercando Data Center al feature-set de Notion (íconos/emoji por
 página, dashboard de Inicio) según lo que el usuario pida a medida que lo
 usa.

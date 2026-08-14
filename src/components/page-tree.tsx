@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition, type DragEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -19,33 +19,114 @@ function buildTree(items: PageTreeItem[], parentId: string | null): TreeNode[] {
     .map((item) => ({ ...item, children: buildTree(items, item.id) }));
 }
 
+function getDescendantIds(items: PageTreeItem[], rootId: string): Set<string> {
+  const descendants = new Set<string>();
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const item of items) {
+      if (item.parentId === current && !descendants.has(item.id)) {
+        descendants.add(item.id);
+        queue.push(item.id);
+      }
+    }
+  }
+  return descendants;
+}
+
 type CreatePageAction = (
   parentId: string | null,
   formData: FormData,
 ) => void | Promise<void>;
+type MovePageAction = (id: string, newParentId: string | null) => void | Promise<void>;
 
 export function PageTree({
-  items,
+  initialItems,
   createPage,
+  movePage,
 }: {
-  items: PageTreeItem[];
+  initialItems: PageTreeItem[];
   createPage: CreatePageAction;
+  movePage: MovePageAction;
 }) {
-  const tree = buildTree(items, null);
+  const [items, setItems] = useState(initialItems);
+  const [, startTransition] = useTransition();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | "root" | null>(null);
 
-  if (tree.length === 0) {
-    return (
-      <p className="text-sm text-neutral-500">
-        Todavía no creaste ninguna página.
-      </p>
+  const blockedDropIds = draggingId
+    ? new Set([draggingId, ...getDescendantIds(items, draggingId)])
+    : new Set<string>();
+
+  function handleDrop(targetId: string | null) {
+    const id = draggingId;
+    setDraggingId(null);
+    setOverId(null);
+    if (!id) return;
+    if (targetId !== null && blockedDropIds.has(targetId)) return;
+
+    const current = items.find((item) => item.id === id);
+    if (!current || current.parentId === targetId) return;
+
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, parentId: targetId } : item)),
     );
+    startTransition(() => {
+      movePage(id, targetId);
+    });
   }
 
+  const tree = buildTree(items, null);
+
   return (
-    <div className="space-y-0.5">
-      {tree.map((node) => (
-        <PageNode key={node.id} node={node} depth={0} createPage={createPage} />
-      ))}
+    <div className="space-y-1">
+      {draggingId && (
+        <div
+          onDragOver={(event) => {
+            event.preventDefault();
+            setOverId("root");
+          }}
+          onDragLeave={() =>
+            setOverId((prev) => (prev === "root" ? null : prev))
+          }
+          onDrop={(event) => {
+            event.preventDefault();
+            handleDrop(null);
+          }}
+          className={
+            overId === "root"
+              ? "rounded-md border border-dashed border-neutral-400 bg-neutral-100 px-2 py-1.5 text-xs text-neutral-600"
+              : "rounded-md border border-dashed border-neutral-200 px-2 py-1.5 text-xs text-neutral-400"
+          }
+        >
+          Soltar acá para mover al nivel raíz
+        </div>
+      )}
+
+      {tree.length === 0 ? (
+        <p className="text-sm text-neutral-500">
+          Todavía no creaste ninguna página.
+        </p>
+      ) : (
+        tree.map((node) => (
+          <PageNode
+            key={node.id}
+            node={node}
+            depth={0}
+            createPage={createPage}
+            draggingId={draggingId}
+            overId={overId}
+            blockedDropIds={blockedDropIds}
+            onDragStart={setDraggingId}
+            onDragEnd={() => {
+              setDraggingId(null);
+              setOverId(null);
+            }}
+            onDragEnterNode={setOverId}
+            onDropOnNode={handleDrop}
+          />
+        ))
+      )}
     </div>
   );
 }
@@ -54,21 +135,61 @@ function PageNode({
   node,
   depth,
   createPage,
+  draggingId,
+  overId,
+  blockedDropIds,
+  onDragStart,
+  onDragEnd,
+  onDragEnterNode,
+  onDropOnNode,
 }: {
   node: TreeNode;
   depth: number;
   createPage: CreatePageAction;
+  draggingId: string | null;
+  overId: string | "root" | null;
+  blockedDropIds: Set<string>;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
+  onDragEnterNode: (id: string) => void;
+  onDropOnNode: (id: string) => void;
 }) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(true);
   const [addingChild, setAddingChild] = useState(false);
   const isActive = pathname === `/data-center/paginas/${node.id}`;
   const hasChildren = node.children.length > 0;
+  const isDragging = draggingId === node.id;
+  const isBlockedTarget = blockedDropIds.has(node.id);
+  const isDropTarget = overId === node.id && !isBlockedTarget;
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    if (isBlockedTarget) return;
+    event.preventDefault();
+    onDragEnterNode(node.id);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    onDropOnNode(node.id);
+  }
 
   return (
     <div>
       <div
-        className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-neutral-100"
+        draggable
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "move";
+          onDragStart(node.id);
+        }}
+        onDragEnd={onDragEnd}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        className={
+          "group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-neutral-100" +
+          (isDragging ? " opacity-40" : "") +
+          (isDropTarget ? " bg-blue-50 ring-1 ring-inset ring-blue-300" : "")
+        }
         style={{ paddingLeft: depth * 16 }}
       >
         <button
@@ -81,6 +202,7 @@ function PageNode({
         </button>
         <Link
           href={`/data-center/paginas/${node.id}`}
+          draggable={false}
           className={
             isActive
               ? "flex-1 truncate rounded px-1.5 py-1 text-sm font-medium text-neutral-900"
@@ -140,6 +262,13 @@ function PageNode({
               node={child}
               depth={depth + 1}
               createPage={createPage}
+              draggingId={draggingId}
+              overId={overId}
+              blockedDropIds={blockedDropIds}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onDragEnterNode={onDragEnterNode}
+              onDropOnNode={onDropOnNode}
             />
           ))}
         </div>
