@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   index,
   integer,
   jsonb,
@@ -81,6 +82,13 @@ export const pages = lifeOs.table(
     userId: uuid("user_id")
       .notNull()
       .references(() => authUsers.id, { onDelete: "cascade" }),
+    // Una página sin padre es una página "raíz" (top-level). Una "carpeta"
+    // en el sentido Notion no es una entidad separada: es simplemente una
+    // página que tiene subpáginas.
+    parentId: uuid("parent_id").references(
+      (): AnyPgColumn => pages.id,
+      { onDelete: "cascade" },
+    ),
     title: text("title").notNull().default("Sin título"),
     content: jsonb("content").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -90,7 +98,10 @@ export const pages = lifeOs.table(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("pages_user_id_idx").on(table.userId)],
+  (table) => [
+    index("pages_user_id_idx").on(table.userId),
+    index("pages_parent_id_idx").on(table.parentId),
+  ],
 );
 
 export const notes = lifeOs.table(

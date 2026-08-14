@@ -56,6 +56,14 @@ roadmap por fases.
   (`generate-doc-form.tsx`) porque `markdown.deserialize` de
   `@yoopta/exports` necesita `DOMParser` — no corre en un server action de
   Node.
+- **Páginas anidadas solo en Data Center, no en Libreta**: `pages` tiene
+  `parentId` autoreferenciado (una página puede tener subpáginas, sin
+  límite de profundidad — igual que Notion, donde una "carpeta" es una
+  página con hijas, no una entidad separada). La Libreta (`notes`)
+  deliberadamente NO tiene esto: sigue siendo una lista plana con
+  tags+buscador, porque es un cuaderno de captura rápida tipo journal, no
+  un wiki jerárquico. No le agregues jerarquía a `notes` sin que el
+  usuario lo pida.
 - **Google Calendar: OAuth propio, no el conector de la sesión de agente**:
   `src/lib/google-calendar.ts` implementa el flow de OAuth2 a mano (fetch
   directo a `accounts.google.com` / `oauth2.googleapis.com`), independiente
@@ -78,10 +86,12 @@ roadmap por fases.
 - `src/app/(app)/` — rutas protegidas por `proxy.ts`, con el layout del
   sidebar (Inicio, Data Center, Libreta, Finanzas, Foco).
   - `data-center/` tiene su propio layout con tabs (Páginas/Tareas/
-    Calendario/Generar con IA): `data-center/page.tsx` (páginas),
-    `data-center/paginas/[id]/` (editor), `data-center/tareas/` (tablero
-    por estado + `pr-actions.ts` para crear PRs), `data-center/calendario/`
-    (Google Calendar, solo lectura), `data-center/generar/` (docs con IA).
+    Calendario/Generar con IA): `data-center/page.tsx` (árbol de páginas,
+    ver `src/components/page-tree.tsx`), `data-center/paginas/[id]/`
+    (editor, con breadcrumb de ancestros y sección de subpáginas),
+    `data-center/tareas/` (tablero por estado + `pr-actions.ts` para crear
+    PRs), `data-center/calendario/` (Google Calendar, solo lectura),
+    `data-center/generar/` (docs con IA).
   - `libreta/page.tsx` (lista + buscador por `?q=`), `libreta/[id]/`
     (editor de nota con tags).
   - `finanzas/` tiene layout con tabs (Resumen/Movimientos/Cuentas/
@@ -113,20 +123,24 @@ roadmap por fases.
 - `src/app/api/google-calendar/connect/` y `.../callback/` — route
   handlers del flow de OAuth (fuera del grupo `(app)` porque no renderizan
   UI, pero igual protegidos por `proxy.ts`).
-- `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages`, `notes`,
-  `accounts`, `categories`, `transactions`, `budgets`,
+- `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages` —con
+  `parentId` autoreferenciado para jerarquía—, `notes`, `accounts`,
+  `categories`, `transactions`, `budgets`,
   `google_calendar_connections`, todo en el schema `life_os`) y `index.ts`
-  (cliente de conexión). Cuatro migraciones (`0000_` a `0003_`, ver
+  (cliente de conexión). Cinco migraciones (`0000_` a `0004_`, ver
   `src/db/migrations/`) todavía no se aplicaron en Supabase (ver README →
   Base de datos).
 - `src/components/block-editor.tsx` — wrapper de Yoopta.
   `entity-editor.tsx` — título + editor + autosave debounced (800ms),
   reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
-  `task-board.tsx` — tablero de tareas con estado optimista en cliente +
-  botón "Crear PR" por tarea. `pomodoro-timer.tsx` — timer con settings
-  persistidos en localStorage. `focus-ambience.tsx` — presets de color +
-  embeds de audio/video personalizables, todo en localStorage (ver
-  Decisiones). `generate-doc-form.tsx` — form de generación de docs con IA.
+  `page-tree.tsx` — árbol recursivo de páginas (expandir/colapsar,
+  resaltado de página activa, "+" para crear subpágina inline), usado en
+  `data-center/page.tsx`. `task-board.tsx` — tablero de tareas con estado
+  optimista en cliente + botón "Crear PR" por tarea. `pomodoro-timer.tsx`
+  — timer con settings persistidos en localStorage. `focus-ambience.tsx`
+  — presets de color + embeds de audio/video personalizables, todo en
+  localStorage (ver Decisiones). `generate-doc-form.tsx` — form de
+  generación de docs con IA.
 
 ## Patrón de server actions (seguir en todo lo nuevo)
 
@@ -137,16 +151,24 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 ## Estado actual
 
-Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas, tareas, calendario,
-generación de docs con IA, PRs), Libreta, Pomodoro, Finanzas, Foco. Build y
-lint verificados en cada paso; NO se pudo probar en runtime contra Supabase
-real ni contra las APIs de GitHub/Google/Anthropic desde el sandbox donde
-se armó (red bloqueada a la mayoría de los dominios externos) — probar en
-local o Vercel antes de asumir que algo funciona end-to-end. Las cuatro
-migraciones SQL todavía no se corrieron en Supabase (ver README), y
+Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas con jerarquía tipo
+Notion, tareas, calendario, generación de docs con IA, PRs), Libreta,
+Pomodoro, Finanzas, Foco. Build y lint verificados en cada paso; NO se pudo
+probar en runtime contra Supabase real ni contra las APIs de
+GitHub/Google/Anthropic desde el sandbox donde se armó (red bloqueada a la
+mayoría de los dominios externos) — probar en local o Vercel antes de
+asumir que algo funciona end-to-end. Las cinco migraciones SQL todavía no
+se corrieron en Supabase (ver README), y
 `GITHUB_TOKEN`/`ANTHROPIC_API_KEY`/`GOOGLE_CLIENT_ID`+`GOOGLE_CLIENT_SECRET`
 todavía no están configuradas (ver README y `.env.local.example`).
 
+El usuario pidió explícitamente que Life OS sea "casi un clon de Notion":
+todas las features clave de Notion tienen que estar presentes, y se van a
+seguir sumando features nuevas en conjunto con el uso diario — no asumas
+que el alcance está cerrado en lo ya construido.
+
 Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
-o pulir lo ya construido (`@yoopta/ui`, plugin de imágenes, dashboard de
-Inicio) si el uso diario lo pide primero.
+o seguir acercando Data Center al feature-set de Notion (`@yoopta/ui` con
+menú `/` y toolbar flotante, plugin de imágenes/tablas, mover páginas de
+padre por drag-and-drop o selector, íconos/emoji por página, dashboard de
+Inicio) según lo que el usuario pida a medida que lo usa.

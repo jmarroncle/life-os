@@ -10,7 +10,12 @@ import type { YooptaContentValue } from "@/components/block-editor";
 export async function listPages() {
   const user = await requireUser();
   return db
-    .select({ id: pages.id, title: pages.title, updatedAt: pages.updatedAt })
+    .select({
+      id: pages.id,
+      parentId: pages.parentId,
+      title: pages.title,
+      updatedAt: pages.updatedAt,
+    })
     .from(pages)
     .where(eq(pages.userId, user.id))
     .orderBy(desc(pages.updatedAt));
@@ -26,13 +31,13 @@ export async function getPage(id: string) {
   return page ?? null;
 }
 
-export async function createPage(formData: FormData) {
+export async function createPage(parentId: string | null, formData: FormData) {
   const user = await requireUser();
   const title = String(formData.get("title") ?? "").trim() || "Sin título";
 
   const [created] = await db
     .insert(pages)
-    .values({ userId: user.id, title, content: {} })
+    .values({ userId: user.id, parentId, title, content: {} })
     .returning({ id: pages.id });
 
   redirect(`/data-center/paginas/${created.id}`);
@@ -51,10 +56,16 @@ export async function updatePage(
 
 export async function deletePage(id: string) {
   const user = await requireUser();
-  await db
+  const [deleted] = await db
     .delete(pages)
-    .where(and(eq(pages.id, id), eq(pages.userId, user.id)));
-  redirect("/data-center");
+    .where(and(eq(pages.id, id), eq(pages.userId, user.id)))
+    .returning({ parentId: pages.parentId });
+
+  redirect(
+    deleted?.parentId
+      ? `/data-center/paginas/${deleted.parentId}`
+      : "/data-center",
+  );
 }
 
 export async function createPageWithContent(

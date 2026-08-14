@@ -1,12 +1,12 @@
-import Link from "next/link";
 import { createPage, listPages } from "./actions";
+import { PageTree } from "@/components/page-tree";
 
 export default async function DataCenterPaginasPage() {
   const items = await listPages();
 
   return (
     <div className="space-y-6">
-      <form action={createPage} className="flex gap-2">
+      <form action={createPage.bind(null, null)} className="flex gap-2">
         <input
           type="text"
           name="title"
@@ -21,27 +21,7 @@ export default async function DataCenterPaginasPage() {
         </button>
       </form>
 
-      {items.length === 0 ? (
-        <p className="text-sm text-neutral-500">
-          Todavía no creaste ninguna página.
-        </p>
-      ) : (
-        <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200">
-          {items.map((page) => (
-            <li key={page.id}>
-              <Link
-                href={`/data-center/paginas/${page.id}`}
-                className="flex items-center justify-between px-4 py-3 text-sm hover:bg-neutral-50"
-              >
-                <span>{page.title}</span>
-                <span className="text-xs text-neutral-400">
-                  {new Date(page.updatedAt).toLocaleDateString("es-AR")}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <PageTree items={items} createPage={createPage} />
     </div>
   );
 }

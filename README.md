@@ -6,9 +6,10 @@ personal / experimento, código abierto.
 
 ## Módulos
 
-- **Data Center**: páginas tipo Notion (editor de bloques) + tareas tipo
-  Asana (proyectos, estados) + calendario de Google + generación de docs
-  técnicas con IA + creación de PRs desde una tarea.
+- **Data Center**: páginas tipo Notion (editor de bloques, con subpáginas
+  anidadas — árbol de páginas/carpetas sin límite de profundidad) + tareas
+  tipo Asana (proyectos, estados) + calendario de Google + generación de
+  docs técnicas con IA + creación de PRs desde una tarea.
 - **Libreta**: notas rápidas tipo journal, con tags y buscador. Pensada como
   PWA instalable para captura desde cualquier dispositivo.
 - **Finanzas**: cuentas, movimientos, categorías, presupuestos y dashboard
@@ -42,6 +43,10 @@ personal / experimento, código abierto.
 - **Fase 3 (hecho)**: generación de docs técnicas con IA (Claude API),
   creación de PRs desde una tarea (GitHub), conexión de Google Calendar
   (solo lectura de próximos eventos).
+- **Data Center: páginas anidadas (hecho)**: cualquier página puede tener
+  subpáginas (una "carpeta" es simplemente una página con hijas, igual que
+  en Notion) — árbol expandible/colapsable en `/data-center`, breadcrumb y
+  sección de subpáginas dentro de cada página.
 - **Fase 4**: personalización (temas, layout de widgets), reportes.
 
 ## Desarrollo local
@@ -78,10 +83,10 @@ Las tablas (`life_os.projects`, `tasks`, `pages`, `notes`, `accounts`,
 todavía no están creadas en Supabase — el schema vive en `src/db/schema.ts`
 pero falta aplicarlo. Dos formas de hacerlo:
 
-- **Rápido (una vez):** pegar el contenido de **las cuatro** migraciones, en
+- **Rápido (una vez):** pegar el contenido de **las cinco** migraciones, en
   orden, en Supabase → SQL Editor → New query, y correrlas (los nombres de
   archivo exactos están en `src/db/migrations/`, empiezan con `0000_`,
-  `0001_`, `0002_`, `0003_`). Mismo flujo que ya usás para
+  `0001_`, `0002_`, `0003_`, `0004_`). Mismo flujo que ya usás para
   `behavioral-design-platform/supabase/schema.sql`.
 - **Con Drizzle (para cambios futuros de schema):** con `DATABASE_URL`
   cargado en `.env.local`, `npm run db:generate` genera la migración y
