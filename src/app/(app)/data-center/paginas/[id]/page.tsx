@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createPage, deletePage, getPage, listPages, updatePage } from "../../actions";
 import { EntityEditor } from "@/components/entity-editor";
+import { PageIconPicker } from "@/components/page-icon-picker";
 import {
   emptyBlockValue,
   type YooptaContentValue,
@@ -18,12 +19,12 @@ export default async function PaginaPage({
   }
 
   const byId = new Map(allPages.map((item) => [item.id, item]));
-  const ancestors: { id: string; title: string }[] = [];
+  const ancestors: { id: string; title: string; icon: string | null }[] = [];
   let current = byId.get(id)?.parentId ?? null;
   while (current) {
     const ancestor = byId.get(current);
     if (!ancestor) break;
-    ancestors.unshift({ id: ancestor.id, title: ancestor.title });
+    ancestors.unshift({ id: ancestor.id, title: ancestor.title, icon: ancestor.icon });
     current = ancestor.parentId;
   }
 
@@ -37,6 +38,11 @@ export default async function PaginaPage({
   async function saveContent(content: YooptaContentValue) {
     "use server";
     await updatePage(id, { content });
+  }
+
+  async function saveIcon(icon: string | null) {
+    "use server";
+    await updatePage(id, { icon });
   }
 
   return (
@@ -53,12 +59,14 @@ export default async function PaginaPage({
                 href={`/data-center/paginas/${ancestor.id}`}
                 className="hover:text-neutral-900"
               >
-                {ancestor.title}
+                {ancestor.icon ?? "📄"} {ancestor.title}
               </Link>
             </span>
           ))}
           <span>/</span>
-          <span className="text-neutral-600">{page.title}</span>
+          <span className="text-neutral-600">
+            {page.icon ?? "📄"} {page.title}
+          </span>
         </nav>
 
         <form action={deletePage.bind(null, id)}>
@@ -70,6 +78,8 @@ export default async function PaginaPage({
           </button>
         </form>
       </div>
+
+      <PageIconPicker initialIcon={page.icon} onIconChange={saveIcon} />
 
       <EntityEditor
         initialTitle={page.title}
@@ -88,7 +98,9 @@ export default async function PaginaPage({
                   href={`/data-center/paginas/${child.id}`}
                   className="flex items-center justify-between px-3 py-2 text-sm hover:bg-neutral-50"
                 >
-                  <span>{child.title}</span>
+                  <span>
+                    {child.icon ?? "📄"} {child.title}
+                  </span>
                   <span className="text-xs text-neutral-400">
                     {new Date(child.updatedAt).toLocaleDateString("es-AR")}
                   </span>

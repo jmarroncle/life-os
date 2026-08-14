@@ -14,6 +14,7 @@ export async function listPages() {
       id: pages.id,
       parentId: pages.parentId,
       title: pages.title,
+      icon: pages.icon,
       updatedAt: pages.updatedAt,
     })
     .from(pages)
@@ -45,7 +46,7 @@ export async function createPage(parentId: string | null, formData: FormData) {
 
 export async function updatePage(
   id: string,
-  data: { title?: string; content?: YooptaContentValue },
+  data: { title?: string; content?: YooptaContentValue; icon?: string | null },
 ) {
   const user = await requireUser();
   await db

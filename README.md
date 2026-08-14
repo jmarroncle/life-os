@@ -8,8 +8,9 @@ personal / experimento, código abierto.
 
 - **Data Center**: páginas tipo Notion (editor de bloques, con subpáginas
   anidadas — árbol de páginas/carpetas sin límite de profundidad,
-  reordenable arrastrando una página sobre otra o al nivel raíz) + tareas
-  tipo Asana (proyectos, estados) + calendario de Google + generación de
+  reordenable arrastrando una página sobre otra o al nivel raíz — y un
+  ícono/emoji por página) + tareas tipo Asana (proyectos, estados) +
+  calendario de Google + generación de
   docs técnicas con IA + creación de PRs desde una tarea.
 - **Libreta**: notas rápidas tipo journal, con tags y buscador. Pensada como
   PWA instalable para captura desde cualquier dispositivo.
@@ -88,10 +89,10 @@ Las tablas (`life_os.projects`, `tasks`, `pages`, `notes`, `accounts`,
 todavía no están creadas en Supabase — el schema vive en `src/db/schema.ts`
 pero falta aplicarlo. Dos formas de hacerlo:
 
-- **Rápido (una vez):** pegar el contenido de **las cinco** migraciones, en
+- **Rápido (una vez):** pegar el contenido de **las seis** migraciones, en
   orden, en Supabase → SQL Editor → New query, y correrlas (los nombres de
   archivo exactos están en `src/db/migrations/`, empiezan con `0000_`,
-  `0001_`, `0002_`, `0003_`, `0004_`). Mismo flujo que ya usás para
+  `0001_`, `0002_`, `0003_`, `0004_`, `0005_`). Mismo flujo que ya usás para
   `behavioral-design-platform/supabase/schema.sql`.
 - **Con Drizzle (para cambios futuros de schema):** con `DATABASE_URL`
   cargado en `.env.local`, `npm run db:generate` genera la migración y
@@ -174,6 +175,11 @@ o falta la policy de `insert`).
   dentro de sí misma o de una de sus propias subpáginas) y la UI también
   bloquea esos drops visualmente. No soporta touch ni teclado — aceptable
   para un uso mayormente de escritorio.
+- Cada página puede tener un ícono (`page-icon-picker.tsx`): un popover
+  casero con una grilla de emoji comunes + un campo de texto para pegar
+  cualquier otro (no hay librería de emoji-picker, ni upload de imagen
+  como ícono). Sin ícono elegido se muestra "📄" como fallback en el
+  árbol, el breadcrumb y la lista de subpáginas.
 - Todas las queries a la base pasan por Drizzle con conexión directa a
   Postgres (`DATABASE_URL`), no por la REST API de Supabase — o sea que las
   políticas de RLS (si algún día se agregan) NO protegen estas tablas. Cada

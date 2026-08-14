@@ -90,6 +90,10 @@ export const pages = lifeOs.table(
       { onDelete: "cascade" },
     ),
     title: text("title").notNull().default("Sin título"),
+    // Emoji suelto (p. ej. "📄"), null = sin ícono custom. No hay soporte
+    // para subir imágenes como ícono, solo emoji, igual que la Libreta no
+    // tiene tags con color: mantener la personalización simple.
+    icon: text("icon"),
     content: jsonb("content").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

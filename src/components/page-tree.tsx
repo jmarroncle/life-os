@@ -8,6 +8,7 @@ export type PageTreeItem = {
   id: string;
   parentId: string | null;
   title: string;
+  icon: string | null;
   updatedAt: Date;
 };
 
@@ -209,7 +210,7 @@ function PageNode({
               : "flex-1 truncate rounded px-1.5 py-1 text-sm text-neutral-700"
           }
         >
-          {node.title}
+          {node.icon ?? "📄"} {node.title}
         </Link>
         <button
           type="button"

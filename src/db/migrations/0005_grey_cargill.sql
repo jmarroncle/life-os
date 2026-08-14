@@ -1,0 +1,1 @@
+ALTER TABLE "life_os"."pages" ADD COLUMN "icon" text;

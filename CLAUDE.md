@@ -127,6 +127,18 @@ roadmap por fases.
   conocida: drag-and-drop nativo no soporta touch ni teclado — aceptable
   para un árbol de páginas de uso mayormente de escritorio, no le sumes
   `@dnd-kit` acá sin que el usuario lo pida.
+- **Íconos de página: emoji en texto plano, sin picker externo**: `pages`
+  tiene `icon` (`text`, nullable). `PageIconPicker`
+  (`page-icon-picker.tsx`) es un popover casero (sin `asChild`/Radix, sin
+  librería de emoji-picker) con una grilla fija de 32 emoji comunes +
+  un `<input>` de texto para pegar cualquier otro (el usuario copia desde
+  el picker nativo del SO, `Cmd+Ctrl+Space` en Mac). Deliberado: no se
+  agregó una dependencia de emoji-picker solo para esto. Sin ícono
+  custom se muestra "📄" como fallback (en el árbol, breadcrumb, y lista
+  de subpáginas) — no hay forma de "ícono realmente vacío", siempre hay
+  algún glifo, igual que Notion. No hay upload de imagen como ícono,
+  solo emoji — mantiene la personalización simple; no lo sumes sin que
+  el usuario lo pida.
 - **Google Calendar: OAuth propio, no el conector de la sesión de agente**:
   `src/lib/google-calendar.ts` implementa el flow de OAuth2 a mano (fetch
   directo a `accounts.google.com` / `oauth2.googleapis.com`), independiente
@@ -192,10 +204,10 @@ roadmap por fases.
   handlers del flow de OAuth (fuera del grupo `(app)` porque no renderizan
   UI, pero igual protegidos por `proxy.ts`).
 - `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages` —con
-  `parentId` autoreferenciado para jerarquía—, `notes`, `accounts`,
-  `categories`, `transactions`, `budgets`,
+  `parentId` autoreferenciado para jerarquía e `icon` para el emoji—,
+  `notes`, `accounts`, `categories`, `transactions`, `budgets`,
   `google_calendar_connections`, todo en el schema `life_os`) y `index.ts`
-  (cliente de conexión). Cinco migraciones (`0000_` a `0004_`, ver
+  (cliente de conexión). Seis migraciones (`0000_` a `0005_`, ver
   `src/db/migrations/`) todavía no se aplicaron en Supabase (ver README →
   Base de datos).
 - `src/components/block-editor.tsx` — wrapper de Yoopta: envuelve en
@@ -210,7 +222,9 @@ roadmap por fases.
   `page-tree.tsx` — árbol recursivo de páginas (expandir/colapsar,
   resaltado de página activa, "+" para crear subpágina inline, drag-and-drop
   nativo para reparentar arrastrando una página sobre otra o al nivel
-  raíz), usado en `data-center/page.tsx`. `task-board.tsx` — tablero de
+  raíz, ícono/emoji antes del título), usado en `data-center/page.tsx`.
+  `page-icon-picker.tsx` — popover casero de emoji, usado en
+  `data-center/paginas/[id]/page.tsx`. `task-board.tsx` — tablero de
   tareas con estado
   optimista en cliente + botón "Crear PR" por tarea. `pomodoro-timer.tsx`
   — timer con settings persistidos en localStorage. `focus-ambience.tsx`
@@ -228,15 +242,15 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 ## Estado actual
 
 Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas con jerarquía tipo
-Notion —incluido reparentar arrastrando una página sobre otra—, tareas,
-calendario, generación de docs con IA, PRs), Libreta, Pomodoro, Finanzas,
-Foco. Editor de bloques con barra flotante, menú `/`, imágenes (Supabase
-Storage), tablas, y acciones flotantes por bloque
+Notion —reparentar arrastrando una página sobre otra, ícono/emoji por
+página—, tareas, calendario, generación de docs con IA, PRs), Libreta,
+Pomodoro, Finanzas, Foco. Editor de bloques con barra flotante, menú `/`,
+imágenes (Supabase Storage), tablas, y acciones flotantes por bloque
 ("+"/arrastrar-reordenar/duplicar/eliminar). Build y lint verificados en
 cada paso; NO se pudo probar en runtime contra Supabase real ni contra las
 APIs de GitHub/Google/Anthropic desde el sandbox donde se armó (red
 bloqueada a la mayoría de los dominios externos) — probar en local o
-Vercel antes de asumir que algo funciona end-to-end. Las cinco migraciones
+Vercel antes de asumir que algo funciona end-to-end. Las seis migraciones
 SQL todavía no se corrieron en Supabase (ver README → Base de datos), el
 bucket de Storage tampoco (ver README → Storage,
 `supabase/storage-setup.sql`), y
@@ -249,6 +263,6 @@ seguir sumando features nuevas en conjunto con el uso diario — no asumas
 que el alcance está cerrado en lo ya construido.
 
 Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
-o seguir acercando Data Center al feature-set de Notion (íconos/emoji por
-página, dashboard de Inicio) según lo que el usuario pida a medida que lo
+o seguir acercando Data Center al feature-set de Notion (dashboard de
+Inicio, hoy un placeholder) según lo que el usuario pida a medida que lo
 usa.
