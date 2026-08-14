@@ -90,10 +90,16 @@ export async function POST(req: Request) {
 
   const target = new URL(redirectUri);
 
+  // 303, no el 307 default de NextResponse.redirect: un redirect OAuth
+  // siempre tiene que llegar como GET al redirect_uri del cliente, pero
+  // esto responde a un POST (el submit del form de consentimiento) — con
+  // 307 el browser reintenta el redirect preservando el método y termina
+  // haciendo POST al callback de claude.ai, que sólo acepta GET (así se
+  // manifestó como "Method Not Allowed" del lado de claude.ai).
   if (decision !== "allow") {
     target.searchParams.set("error", "access_denied");
     if (state) target.searchParams.set("state", state);
-    return NextResponse.redirect(target);
+    return NextResponse.redirect(target, 303);
   }
 
   const supabase = await createClient();
@@ -112,5 +118,5 @@ export async function POST(req: Request) {
   });
   target.searchParams.set("code", code);
   if (state) target.searchParams.set("state", state);
-  return NextResponse.redirect(target);
+  return NextResponse.redirect(target, 303);
 }
