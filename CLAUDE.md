@@ -14,22 +14,42 @@ roadmap por fases.
 - **Auth**: solo magic link (sin password). Un único usuario por ahora.
 - **Editor de bloques**: **Yoopta-Editor** (MIT, sobre Slate.js, exporta a
   Markdown/HTML), instalado en Fase 1. Componente reutilizable en
-  `src/components/block-editor.tsx`. Set de plugins deliberadamente chico
-  (paragraph, headings, lists, blockquote, code, link, divider, marks) —
-  image/table quedan afuera hasta wirear upload a Supabase Storage.
-  `@yoopta/ui` (barra flotante de marks al seleccionar texto +  menú `/`
-  para insertar/convertir bloques) SÍ está integrado:
+  `src/components/block-editor.tsx`. Plugins: paragraph, headings, lists,
+  blockquote, code, link, divider, marks, **image**, **table**.
+  `@yoopta/ui` (barra flotante de marks al seleccionar texto + menú `/`
+  para insertar/convertir bloques) está integrado:
   `block-editor-toolbar.tsx` y `block-editor-slash-menu.tsx`, renderizados
   como `children` de `<YooptaEditor>` (así reciben el contexto vía
   `useYooptaEditor()`, igual que hace la librería internamente). Son
   componentes compuestos (Root/Content/Item), no drop-in — los ítems del
-  menú `/` llaman `editor.toggleBlock(<TypeKey>, { focus: true })` con la
-  key PascalCase de cada plugin (`Paragraph`, `HeadingOne`, `BulletedList`,
-  etc., no el tipo de elemento Slate en minúscula). Se desactivan cuando
+  menú `/` llaman `editor.toggleBlock(<TypeKey>, { focus: true })` para
+  bloques de texto (con la key PascalCase de cada plugin: `Paragraph`,
+  `HeadingOne`, `BulletedList`, etc., no el tipo de elemento Slate en
+  minúscula) o los comandos dedicados `ImageCommands.insertImage` /
+  `TableCommands.insertTable` para imagen/tabla. Se desactivan cuando
   `readOnly` es `true`. No se agregó `lucide-react` (no está hoisted en
   node_modules, es una dependencia interna de `@yoopta/ui`) — los botones
   usan texto plano (B/I/U/S) para no sumar una dependencia nueva solo por
   íconos.
+- **Imágenes → Supabase Storage**: `src/lib/uploads.ts` (`"use server"`)
+  expone `uploadBlockImage(file)`, usado por el plugin `@yoopta/image` vía
+  un wrapper client-side en `yoopta-plugins.ts` (`handleImageUpload`) que
+  descarta el segundo argumento `onProgress` del plugin antes de llamar a
+  la server action — una función no se puede pasar como argumento a una
+  server action (no serializa). Sube a un bucket público
+  `life-os-uploads`, cada archivo en `<user_id>/<uuid>.<ext>`, con
+  policies de storage que limitan insert/delete a la propia carpeta del
+  usuario (ver `supabase/storage-setup.sql`, hay que correrlo a mano en
+  Supabase — Drizzle no gestiona Storage). No hay borrado del archivo en
+  Storage al eliminar el bloque de imagen (queda huérfano) — aceptable
+  para uso personal, no lo agregues sin que el usuario lo pida.
+- **`@yoopta/table` necesita un cast de tipos**: en `yoopta-plugins.ts`,
+  `Table as unknown as YooptaPlugin<Record<string, SlateElement>>` — el
+  tipo de `Table` no entra directo en el array heterogéneo de plugins
+  porque su `children` interno referencia sus propias 3 claves de
+  elemento (table/table-row/table-data-cell), algo que TS no logra
+  angostar al tipo genérico que espera `createYooptaEditor`. Es solo una
+  limitación de los tipos del paquete, no afecta el runtime.
 - **PWA**: manifest básico ya armado (`src/app/manifest.ts`). Offline real
   (service worker) y push notifications quedan para más adelante, no son
   parte del scaffold inicial.
@@ -128,7 +148,12 @@ roadmap por fases.
   `listUpcomingEvents`).
 - `src/lib/yoopta-plugins.ts` — `plugins`/`marks` compartidos entre
   `block-editor.tsx` y `generate-doc-form.tsx` (este último arma un editor
-  temporal solo para `markdown.deserialize`).
+  temporal solo para `markdown.deserialize`). Incluye `handleImageUpload`,
+  el wrapper client-side de `uploadBlockImage`.
+- `src/lib/uploads.ts` — `"use server"`, `uploadBlockImage(file)` sube a
+  Supabase Storage (bucket `life-os-uploads`) y devuelve la URL pública.
+- `supabase/storage-setup.sql` — bucket + policies de Storage, correr a
+  mano en Supabase SQL Editor (no lo gestiona Drizzle).
 - `src/app/api/google-calendar/connect/` y `.../callback/` — route
   handlers del flow de OAuth (fuera del grupo `(app)` porque no renderizan
   UI, pero igual protegidos por `proxy.ts`).
@@ -164,12 +189,14 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas con jerarquía tipo
 Notion, tareas, calendario, generación de docs con IA, PRs), Libreta,
-Pomodoro, Finanzas, Foco. Build y lint verificados en cada paso; NO se pudo
-probar en runtime contra Supabase real ni contra las APIs de
-GitHub/Google/Anthropic desde el sandbox donde se armó (red bloqueada a la
-mayoría de los dominios externos) — probar en local o Vercel antes de
+Pomodoro, Finanzas, Foco. Editor de bloques con barra flotante, menú `/`,
+imágenes (Supabase Storage) y tablas. Build y lint verificados en cada
+paso; NO se pudo probar en runtime contra Supabase real ni contra las APIs
+de GitHub/Google/Anthropic desde el sandbox donde se armó (red bloqueada a
+la mayoría de los dominios externos) — probar en local o Vercel antes de
 asumir que algo funciona end-to-end. Las cinco migraciones SQL todavía no
-se corrieron en Supabase (ver README), y
+se corrieron en Supabase (ver README → Base de datos), el bucket de
+Storage tampoco (ver README → Storage, `supabase/storage-setup.sql`), y
 `GITHUB_TOKEN`/`ANTHROPIC_API_KEY`/`GOOGLE_CLIENT_ID`+`GOOGLE_CLIENT_SECRET`
 todavía no están configuradas (ver README y `.env.local.example`).
 
@@ -179,7 +206,8 @@ seguir sumando features nuevas en conjunto con el uso diario — no asumas
 que el alcance está cerrado en lo ya construido.
 
 Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
-o seguir acercando Data Center al feature-set de Notion (`@yoopta/ui` con
-menú `/` y toolbar flotante, plugin de imágenes/tablas, mover páginas de
-padre por drag-and-drop o selector, íconos/emoji por página, dashboard de
-Inicio) según lo que el usuario pida a medida que lo usa.
+o seguir acercando Data Center al feature-set de Notion
+(`FloatingBlockActions` de `@yoopta/ui` — drag handle + menú "..." por
+bloque, mover páginas de padre por drag-and-drop o selector, íconos/emoji
+por página, dashboard de Inicio) según lo que el usuario pida a medida que
+lo usa.

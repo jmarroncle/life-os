@@ -5,6 +5,8 @@ import {
   SlashCommandMenu,
   type SlashCommandItemType,
 } from "@yoopta/ui/slash-command-menu";
+import { ImageCommands } from "@yoopta/image";
+import { TableCommands } from "@yoopta/table";
 
 export function BlockEditorSlashMenu() {
   const editor = useYooptaEditor();
@@ -79,6 +81,25 @@ export function BlockEditorSlashMenu() {
       description: "Línea divisoria",
       group: "Otro",
       onSelect: () => editor.toggleBlock("Divider", { focus: true }),
+    },
+    {
+      id: "image",
+      title: "Imagen",
+      description: "Subir una imagen",
+      group: "Multimedia",
+      onSelect: () => ImageCommands.insertImage(editor, { focus: true }),
+    },
+    {
+      id: "table",
+      title: "Tabla",
+      description: "Tabla de 3×3",
+      group: "Multimedia",
+      onSelect: () =>
+        TableCommands.insertTable(editor, {
+          rows: 3,
+          columns: 3,
+          headerRow: true,
+        }),
     },
   ];
 

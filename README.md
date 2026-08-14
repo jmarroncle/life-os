@@ -29,7 +29,8 @@ personal / experimento, código abierto.
   tipo markdown (`# `, `## `, `- `, etc.) y de teclado (`Cmd+B`, `Cmd+I`, …),
   además de la barra flotante (al seleccionar texto: negrita, itálica,
   subrayado, tachado, código) y el menú `/` (para insertar o convertir el
-  bloque actual) de `@yoopta/ui`.
+  bloque actual, incluidas imágenes y tablas) de `@yoopta/ui`. Las imágenes
+  se suben a Supabase Storage (ver Storage más abajo).
 
 ## Roadmap
 
@@ -93,6 +94,22 @@ pero falta aplicarlo. Dos formas de hacerlo:
   cargado en `.env.local`, `npm run db:generate` genera la migración y
   `npm run db:migrate` la aplica.
 
+## Storage (imágenes)
+
+Las imágenes que se suben desde el editor de bloques (menú `/` → Imagen)
+van a un bucket de Supabase Storage que **no** se crea con Drizzle (Storage
+vive en el schema `storage`, gestionado por Supabase, no por nuestras
+migraciones de Postgres). Correr una sola vez en Supabase → SQL Editor:
+
+- Pegar y ejecutar el contenido de `supabase/storage-setup.sql`. Crea el
+  bucket `life-os-uploads` (público, para poder renderizar `<img src>`
+  directo) y dos policies que limitan subir/borrar archivos a la propia
+  carpeta del usuario (`<user_id>/archivo.ext`), igual que el filtro manual
+  por `user_id` que ya usan las server actions sobre Postgres.
+
+Sin este paso, subir una imagen desde el editor falla (el bucket no existe
+o falta la policy de `insert`).
+
 ## Deploy en Vercel
 
 1. Importar este repo en [vercel.com/new](https://vercel.com/new).
@@ -115,10 +132,23 @@ pero falta aplicarlo. Dos formas de hacerlo:
 - El ícono de `public/icon.svg` es un placeholder — conviene reemplazarlo
   por un ícono real (y sumar versiones PNG 192/512 para mejor soporte en
   iOS) antes de instalar la PWA en el celular.
-- El plugin de imágenes de Yoopta (`@yoopta/image`) y la tabla (`@yoopta/table`)
-  quedaron afuera del set de Fase 1 a propósito — requieren wirear upload a
-  Supabase Storage, que es su propio pedacito de trabajo. Se suman cuando
-  haga falta.
+- `@yoopta/image` y `@yoopta/table` están integrados. La subida de imágenes
+  (`src/lib/uploads.ts`, server action `uploadBlockImage`) va a un bucket de
+  Supabase Storage — ver la sección Storage más arriba para el setup
+  manual del bucket/policies. El wrapper `handleImageUpload` en
+  `yoopta-plugins.ts` existe porque el plugin llama
+  `upload(file, onProgress)` del lado del cliente y una función no se puede
+  pasar como argumento a una server action (no es serializable); el
+  wrapper la descarta antes de invocar la server action con solo el
+  archivo. No hay borrado de storage al eliminar un bloque de imagen
+  (archivo huérfano queda en el bucket) — aceptable para un uso personal,
+  documentado como pendiente si hace falta más adelante.
+- El tipo de `Table` (`@yoopta/table`) necesita un cast (`as unknown as
+  YooptaPlugin<...>`) en `yoopta-plugins.ts` para entrar en el array de
+  plugins — es una limitación de los tipos del paquete (su `children`
+  interno referencia sus propias 3 claves de elemento, algo que no colapsa
+  bien al tipo genérico que espera `createYooptaEditor`), no afecta el
+  comportamiento en runtime.
 - `@yoopta/ui` está integrado para `FloatingToolbar` (marks al seleccionar
   texto) y `SlashCommandMenu` (menú `/` para insertar/convertir bloques) —
   ver `block-editor-toolbar.tsx` y `block-editor-slash-menu.tsx`. Son
