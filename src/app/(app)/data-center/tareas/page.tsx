@@ -1,5 +1,11 @@
 import { TaskBoard } from "@/components/task-board";
-import { createProject, createTask, listProjects, listTasks } from "./actions";
+import {
+  createProject,
+  createTask,
+  listProjects,
+  listTasks,
+  setProjectRepo,
+} from "./actions";
 
 export default async function TareasPage() {
   const [tasksList, projectsList] = await Promise.all([
@@ -42,24 +48,56 @@ export default async function TareasPage() {
       </form>
 
       <details className="text-sm text-neutral-500">
-        <summary className="cursor-pointer select-none">
-          + Nuevo proyecto
-        </summary>
-        <form action={createProject} className="mt-2 flex gap-2">
-          <input
-            type="text"
-            name="name"
-            placeholder="Nombre del proyecto"
-            required
-            className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
-          />
-          <button
-            type="submit"
-            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium"
-          >
-            Crear
-          </button>
-        </form>
+        <summary className="cursor-pointer select-none">Proyectos</summary>
+        <div className="mt-3 space-y-4">
+          <form action={createProject} className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              name="name"
+              placeholder="Nombre del proyecto"
+              required
+              className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+            />
+            <input
+              type="text"
+              name="githubRepo"
+              placeholder="owner/repo (opcional, para Crear PR)"
+              className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+            />
+            <button
+              type="submit"
+              className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium"
+            >
+              Crear
+            </button>
+          </form>
+
+          {projectsList.length > 0 && (
+            <ul className="space-y-2">
+              {projectsList.map((project) => (
+                <li key={project.id} className="flex items-center gap-2 text-xs">
+                  <span className="w-32 shrink-0 truncate">{project.name}</span>
+                  <form action={setProjectRepo} className="flex flex-1 gap-2">
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <input
+                      type="text"
+                      name="githubRepo"
+                      defaultValue={project.githubRepo ?? ""}
+                      placeholder="owner/repo"
+                      className="flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                    >
+                      Guardar
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </details>
 
       <TaskBoard initialTasks={tasksList} />

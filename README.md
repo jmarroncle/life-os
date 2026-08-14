@@ -7,8 +7,8 @@ personal / experimento, código abierto.
 ## Módulos
 
 - **Data Center**: páginas tipo Notion (editor de bloques) + tareas tipo
-  Asana (proyectos, subtareas, estados, vistas) + generación de PRs y
-  documentación técnica desde una tarea.
+  Asana (proyectos, estados) + calendario de Google + generación de docs
+  técnicas con IA + creación de PRs desde una tarea.
 - **Libreta**: notas rápidas tipo journal, con tags y buscador. Pensada como
   PWA instalable para captura desde cualquier dispositivo.
 - **Finanzas**: cuentas, movimientos, categorías, presupuestos y dashboard
@@ -39,8 +39,9 @@ personal / experimento, código abierto.
 - **Fase 2 (hecho)**: Finanzas (cuentas, categorías, movimientos,
   presupuestos mensuales, resumen del mes) + Foco con fondos ambientales y
   playlist/video personalizables.
-- **Fase 3**: integración con GitHub (crear PRs desde tareas), Google
-  Calendar, generación de docs técnicas con IA (Claude API).
+- **Fase 3 (hecho)**: generación de docs técnicas con IA (Claude API),
+  creación de PRs desde una tarea (GitHub), conexión de Google Calendar
+  (solo lectura de próximos eventos).
 - **Fase 4**: personalización (temas, layout de widgets), reportes.
 
 ## Desarrollo local
@@ -73,16 +74,14 @@ nuevo.
 ## Base de datos
 
 Las tablas (`life_os.projects`, `tasks`, `pages`, `notes`, `accounts`,
-`categories`, `transactions`, `budgets`) todavía no están creadas en
-Supabase — el schema vive en `src/db/schema.ts` pero falta aplicarlo. Dos
-formas de hacerlo:
+`categories`, `transactions`, `budgets`, `google_calendar_connections`)
+todavía no están creadas en Supabase — el schema vive en `src/db/schema.ts`
+pero falta aplicarlo. Dos formas de hacerlo:
 
-- **Rápido (una vez):** pegar el contenido de **las dos** migraciones, en
-  orden, en Supabase → SQL Editor → New query, y correrlas:
-  1. `src/db/migrations/0000_polite_thena.sql`
-  2. `src/db/migrations/0001_military_major_mapleleaf.sql`
-
-  Mismo flujo que ya usás para
+- **Rápido (una vez):** pegar el contenido de **las cuatro** migraciones, en
+  orden, en Supabase → SQL Editor → New query, y correrlas (los nombres de
+  archivo exactos están en `src/db/migrations/`, empiezan con `0000_`,
+  `0001_`, `0002_`, `0003_`). Mismo flujo que ya usás para
   `behavioral-design-platform/supabase/schema.sql`.
 - **Con Drizzle (para cambios futuros de schema):** con `DATABASE_URL`
   cargado en `.env.local`, `npm run db:generate` genera la migración y
@@ -136,3 +135,28 @@ formas de hacerlo:
   Spotify o YouTube (audio y/o video, por separado) más presets de color
   con CSS puro que no dependen de ningún link externo. Todo se guarda en
   `localStorage`, no en la base.
+- **Generar con IA** usa `claude-opus-5` vía `@anthropic-ai/sdk`, sin
+  streaming (la respuesta es corta, 1-2 páginas de Markdown, `max_tokens:
+  4096`). El Markdown se convierte a bloques de Yoopta **en el cliente**
+  (`markdown.deserialize` de `@yoopta/exports` necesita `DOMParser`, no
+  corre en Node) — por eso `generate-doc-form.tsx` arma un editor temporal
+  en el browser solo para la conversión, y recién ahí llama a
+  `createPageWithContent`.
+- **Crear PR** usa un Personal Access Token de GitHub (`GITHUB_TOKEN`), no
+  una GitHub App con OAuth. Para una herramienta de un solo usuario, un PAT
+  fine-grained (scope Contents + Pull requests, limitado a los repos que
+  uses) es mucho más simple que registrar una App — si algún día esto pasa
+  a multiusuario, ahí sí conviene migrar a OAuth App. El botón crea una
+  rama, comitea un archivo `life-os-tasks/<id>.md` con el título/descripción
+  de la tarea (GitHub no deja abrir un PR sin al menos un commit de
+  diferencia con la base) y abre el PR como draft — es un punto de partida
+  para laburar, no un PR "terminado".
+- **Google Calendar** es de solo lectura (scope
+  `calendar.readonly`) y usa un flow de OAuth propio (`src/lib/
+  google-calendar.ts` + las rutas bajo `src/app/api/google-calendar/`) —
+  independiente de cualquier conector de Google que uses vos como usuario
+  en otro contexto. Guarda `access_token`/`refresh_token` en la tabla
+  `google_calendar_connections` y refresca el token solo cuando está por
+  vencer. Google solo manda `refresh_token` la primera vez que autorizás
+  la app — si reconectás sin haber revocado el acceso antes en
+  myaccount.google.com/permissions, el callback lo detecta y avisa.

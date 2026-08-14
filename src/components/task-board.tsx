@@ -6,6 +6,7 @@ import {
   updateTaskStatus,
   type TaskStatus,
 } from "@/app/(app)/data-center/tareas/actions";
+import { createPullRequestForTask } from "@/app/(app)/data-center/tareas/pr-actions";
 
 type Task = {
   id: string;
@@ -14,6 +15,7 @@ type Task = {
   dueDate: Date | null;
   projectId: string | null;
   projectName: string | null;
+  prUrl: string | null;
 };
 
 const COLUMNS: { status: TaskStatus; label: string }[] = [
@@ -25,6 +27,8 @@ const COLUMNS: { status: TaskStatus; label: string }[] = [
 export function TaskBoard({ initialTasks }: { initialTasks: Task[] }) {
   const [items, setItems] = useState(initialTasks);
   const [, startTransition] = useTransition();
+  const [prLoadingId, setPrLoadingId] = useState<string | null>(null);
+  const [prErrors, setPrErrors] = useState<Record<string, string>>({});
 
   function handleStatusChange(id: string, status: TaskStatus) {
     setItems((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
@@ -38,6 +42,22 @@ export function TaskBoard({ initialTasks }: { initialTasks: Task[] }) {
     startTransition(() => {
       deleteTask(id);
     });
+  }
+
+  async function handleCreatePr(id: string) {
+    setPrLoadingId(id);
+    setPrErrors((prev) => ({ ...prev, [id]: "" }));
+    try {
+      const prUrl = await createPullRequestForTask(id);
+      setItems((prev) => prev.map((t) => (t.id === id ? { ...t, prUrl } : t)));
+    } catch (error) {
+      setPrErrors((prev) => ({
+        ...prev,
+        [id]: error instanceof Error ? error.message : "Error creando el PR.",
+      }));
+    } finally {
+      setPrLoadingId(null);
+    }
   }
 
   return (
@@ -91,6 +111,34 @@ export function TaskBoard({ initialTasks }: { initialTasks: Task[] }) {
                       </option>
                     ))}
                   </select>
+
+                  {task.projectId && (
+                    <div className="mt-2">
+                      {task.prUrl ? (
+                        <a
+                          href={task.prUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          Ver PR →
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => handleCreatePr(task.id)}
+                          disabled={prLoadingId === task.id}
+                          className="text-xs text-neutral-500 hover:text-neutral-900 disabled:opacity-50"
+                        >
+                          {prLoadingId === task.id ? "Creando PR…" : "Crear PR"}
+                        </button>
+                      )}
+                      {prErrors[task.id] && (
+                        <p className="mt-1 text-xs text-red-500">
+                          {prErrors[task.id]}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

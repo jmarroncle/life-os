@@ -42,6 +42,25 @@ roadmap por fases.
   dependen de ningún link. No agregues una URL de playlist/video "de
   ejemplo" sin que el usuario la pida — va contra la instrucción de no
   inventar URLs.
+- **GitHub: PAT, no OAuth App**: "Crear PR" usa `GITHUB_TOKEN` (Personal
+  Access Token fine-grained) en vez de registrar una GitHub App con OAuth
+  — decisión deliberada por ser una herramienta de un solo usuario (mucho
+  menos setup). Si esto pasa a multiusuario algún día, ahí sí migrar a
+  OAuth App; no lo hagas antes sin que el usuario lo pida.
+- **IA: `claude-opus-5`, sin streaming**: `generar/actions.ts` usa
+  `@anthropic-ai/sdk` con `claude-opus-5` (el default recomendado salvo que
+  el usuario pida otro modelo explícitamente), `max_tokens: 4096`,
+  `output_config: {effort: "low"}` (tarea simple, no necesita razonamiento
+  profundo). Sin streaming porque la respuesta es corta (1-2 páginas). El
+  Markdown se convierte a bloques de Yoopta en el **cliente**
+  (`generate-doc-form.tsx`) porque `markdown.deserialize` de
+  `@yoopta/exports` necesita `DOMParser` — no corre en un server action de
+  Node.
+- **Google Calendar: OAuth propio, no el conector de la sesión de agente**:
+  `src/lib/google-calendar.ts` implementa el flow de OAuth2 a mano (fetch
+  directo a `accounts.google.com` / `oauth2.googleapis.com`), independiente
+  de cualquier conector de Google que uses vos como usuario en Claude. Solo
+  scope `calendar.readonly`, sin escritura.
 
 ## Convenciones de Next.js 16 en este repo (releer antes de tocar código)
 
@@ -58,9 +77,11 @@ roadmap por fases.
 
 - `src/app/(app)/` — rutas protegidas por `proxy.ts`, con el layout del
   sidebar (Inicio, Data Center, Libreta, Finanzas, Foco).
-  - `data-center/` tiene su propio layout con tabs (Páginas/Tareas):
-    `data-center/page.tsx` (páginas), `data-center/paginas/[id]/` (editor),
-    `data-center/tareas/` (tablero por estado).
+  - `data-center/` tiene su propio layout con tabs (Páginas/Tareas/
+    Calendario/Generar con IA): `data-center/page.tsx` (páginas),
+    `data-center/paginas/[id]/` (editor), `data-center/tareas/` (tablero
+    por estado + `pr-actions.ts` para crear PRs), `data-center/calendario/`
+    (Google Calendar, solo lectura), `data-center/generar/` (docs con IA).
   - `libreta/page.tsx` (lista + buscador por `?q=`), `libreta/[id]/`
     (editor de nota con tags).
   - `finanzas/` tiene layout con tabs (Resumen/Movimientos/Cuentas/
@@ -81,18 +102,31 @@ roadmap por fases.
   (montos siempre en centavos, ver Decisiones).
 - `src/lib/embed.ts` — `toEmbedUrl()`, convierte un link normal de
   Spotify/YouTube a su URL de embed (usado por `FocusAmbience`).
+- `src/lib/github.ts` — `githubFetch()`, wrapper fino sobre la REST API de
+  GitHub con `GITHUB_TOKEN`.
+- `src/lib/google-calendar.ts` — OAuth2 a mano (`buildGoogleAuthUrl`,
+  `exchangeCodeForTokens`, `getValidAccessToken` con auto-refresh,
+  `listUpcomingEvents`).
+- `src/lib/yoopta-plugins.ts` — `plugins`/`marks` compartidos entre
+  `block-editor.tsx` y `generate-doc-form.tsx` (este último arma un editor
+  temporal solo para `markdown.deserialize`).
+- `src/app/api/google-calendar/connect/` y `.../callback/` — route
+  handlers del flow de OAuth (fuera del grupo `(app)` porque no renderizan
+  UI, pero igual protegidos por `proxy.ts`).
 - `src/db/` — Drizzle: `schema.ts` (`projects`, `tasks`, `pages`, `notes`,
-  `accounts`, `categories`, `transactions`, `budgets`, todo en el schema
-  `life_os`) y `index.ts` (cliente de conexión). Dos migraciones
-  (`0000_polite_thena.sql`, `0001_military_major_mapleleaf.sql`) todavía no
-  se aplicaron en Supabase (ver README → Base de datos).
+  `accounts`, `categories`, `transactions`, `budgets`,
+  `google_calendar_connections`, todo en el schema `life_os`) y `index.ts`
+  (cliente de conexión). Cuatro migraciones (`0000_` a `0003_`, ver
+  `src/db/migrations/`) todavía no se aplicaron en Supabase (ver README →
+  Base de datos).
 - `src/components/block-editor.tsx` — wrapper de Yoopta.
   `entity-editor.tsx` — título + editor + autosave debounced (800ms),
   reutilizado por páginas y notas. `note-editor.tsx` lo extiende con tags.
-  `task-board.tsx` — tablero de tareas con estado optimista en cliente.
-  `pomodoro-timer.tsx` — timer con settings persistidos en localStorage.
-  `focus-ambience.tsx` — presets de color + embeds de audio/video
-  personalizables, todo en localStorage (ver Decisiones).
+  `task-board.tsx` — tablero de tareas con estado optimista en cliente +
+  botón "Crear PR" por tarea. `pomodoro-timer.tsx` — timer con settings
+  persistidos en localStorage. `focus-ambience.tsx` — presets de color +
+  embeds de audio/video personalizables, todo en localStorage (ver
+  Decisiones). `generate-doc-form.tsx` — form de generación de docs con IA.
 
 ## Patrón de server actions (seguir en todo lo nuevo)
 
@@ -103,14 +137,16 @@ que RLS no aplica acá. La única barrera de seguridad es este filtro manual.
 
 ## Estado actual
 
-Fase 1 y Fase 2 completas: Data Center, Libreta, Pomodoro, Finanzas
-(cuentas/categorías/movimientos/presupuestos/resumen) y Foco con fondos
-ambientales. Build y lint verificados en cada paso; NO se pudo probar en
-runtime contra Supabase real desde el sandbox donde se armó (red bloqueada
-a `*.supabase.co`) — probar en local o Vercel antes de asumir que algo
-funciona end-to-end. Las dos migraciones SQL todavía no se corrieron en
-Supabase (ver README).
+Fase 1, Fase 2 y Fase 3 completas: Data Center (páginas, tareas, calendario,
+generación de docs con IA, PRs), Libreta, Pomodoro, Finanzas, Foco. Build y
+lint verificados en cada paso; NO se pudo probar en runtime contra Supabase
+real ni contra las APIs de GitHub/Google/Anthropic desde el sandbox donde
+se armó (red bloqueada a la mayoría de los dominios externos) — probar en
+local o Vercel antes de asumir que algo funciona end-to-end. Las cuatro
+migraciones SQL todavía no se corrieron en Supabase (ver README), y
+`GITHUB_TOKEN`/`ANTHROPIC_API_KEY`/`GOOGLE_CLIENT_ID`+`GOOGLE_CLIENT_SECRET`
+todavía no están configuradas (ver README y `.env.local.example`).
 
-Próximo paso: Fase 3 (GitHub, Google Calendar, generación de docs con IA),
-o pulir lo ya construido (`@yoopta/ui`, plugin de imágenes) si el uso
-diario lo pide primero.
+Próximo paso: Fase 4 (personalización: temas, layout de widgets, reportes),
+o pulir lo ya construido (`@yoopta/ui`, plugin de imágenes, dashboard de
+Inicio) si el uso diario lo pide primero.

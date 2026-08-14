@@ -36,6 +36,8 @@ export const projects = lifeOs.table(
       .notNull()
       .references(() => authUsers.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    // Repo destino para "Crear PR" en las tareas de este proyecto, formato "owner/repo".
+    githubRepo: text("github_repo"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -58,6 +60,7 @@ export const tasks = lifeOs.table(
     status: taskStatus("status").notNull().default("todo"),
     dueDate: timestamp("due_date", { withTimezone: true }),
     position: integer("position").notNull().default(0),
+    prUrl: text("pr_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -215,4 +218,22 @@ export const budgets = lifeOs.table(
       table.month,
     ),
   ],
+);
+
+// --- Google Calendar ---
+// Un solo usuario por ahora, así que una fila por user_id alcanza.
+
+export const googleCalendarConnections = lifeOs.table(
+  "google_calendar_connections",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
 );

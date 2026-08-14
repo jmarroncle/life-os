@@ -12,12 +12,14 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "@yoopta/blockquote": "^6.0.5",
     "@yoopta/code": "^6.0.5",
     "@yoopta/divider": "^6.0.5",
     "@yoopta/editor": "^6.0.5",
+    "@yoopta/exports": "^6.0.5",
     "@yoopta/headings": "^6.0.5",
     "@yoopta/link": "^6.0.5",
     "@yoopta/lists": "^6.0.5",

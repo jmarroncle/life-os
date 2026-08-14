@@ -3,6 +3,8 @@ import Link from "next/link";
 const TABS = [
   { href: "/data-center", label: "Páginas" },
   { href: "/data-center/tareas", label: "Tareas" },
+  { href: "/data-center/calendario", label: "Calendario" },
+  { href: "/data-center/generar", label: "Generar con IA" },
 ];
 
 export default function DataCenterLayout({ children }: LayoutProps<"/data-center">) {

@@ -56,3 +56,15 @@ export async function deletePage(id: string) {
     .where(and(eq(pages.id, id), eq(pages.userId, user.id)));
   redirect("/data-center");
 }
+
+export async function createPageWithContent(
+  title: string,
+  content: YooptaContentValue,
+) {
+  const user = await requireUser();
+  const [created] = await db
+    .insert(pages)
+    .values({ userId: user.id, title: title || "Sin título", content })
+    .returning({ id: pages.id });
+  return created.id;
+}

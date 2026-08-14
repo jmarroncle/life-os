@@ -15,6 +15,20 @@
       "when": 1786616174418,
       "tag": "0001_military_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786673300214,
+      "tag": "0002_unusual_nitro",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786673447941,
+      "tag": "0003_happy_moon_knight",
+      "breakpoints": true
     }
   ]
 }

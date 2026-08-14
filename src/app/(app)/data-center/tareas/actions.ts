@@ -10,7 +10,7 @@ export type TaskStatus = (typeof taskStatus.enumValues)[number];
 export async function listProjects() {
   const user = await requireUser();
   return db
-    .select({ id: projects.id, name: projects.name })
+    .select({ id: projects.id, name: projects.name, githubRepo: projects.githubRepo })
     .from(projects)
     .where(eq(projects.userId, user.id))
     .orderBy(asc(projects.name));
@@ -22,10 +22,12 @@ export async function listTasks() {
     .select({
       id: tasks.id,
       title: tasks.title,
+      description: tasks.description,
       status: tasks.status,
       dueDate: tasks.dueDate,
       projectId: tasks.projectId,
       projectName: projects.name,
+      prUrl: tasks.prUrl,
     })
     .from(tasks)
     .leftJoin(projects, eq(tasks.projectId, projects.id))
@@ -37,8 +39,21 @@ export async function createProject(formData: FormData) {
   const user = await requireUser();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
+  const githubRepo = String(formData.get("githubRepo") ?? "").trim() || null;
 
-  await db.insert(projects).values({ userId: user.id, name });
+  await db.insert(projects).values({ userId: user.id, name, githubRepo });
+}
+
+export async function setProjectRepo(formData: FormData) {
+  const user = await requireUser();
+  const projectId = String(formData.get("projectId") ?? "");
+  const githubRepo = String(formData.get("githubRepo") ?? "").trim() || null;
+  if (!projectId) return;
+
+  await db
+    .update(projects)
+    .set({ githubRepo })
+    .where(and(eq(projects.id, projectId), eq(projects.userId, user.id)));
 }
 
 export async function createTask(formData: FormData) {
