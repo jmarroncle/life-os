@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import YooptaEditor, {
   createYooptaEditor,
   type YooptaContentValue,
@@ -39,6 +40,31 @@ export function BlockEditor({
     [],
   );
 
+  const router = useRouter();
+
+  // Dentro de un bloque editable (contentEditable), el navegador NO sigue
+  // un <a href> con un click normal (lo trata como "posicionar el cursor",
+  // no como "navegar") — es comportamiento nativo, no un bug de Yoopta.
+  // Se intercepta acá para que los links armados por "Convertir en página"
+  // (y cualquier otro link) funcionen con un click normal, en modo edición
+  // o lectura por igual.
+  function handleClickCapture(event: React.MouseEvent<HTMLDivElement>) {
+    const anchor = (event.target as HTMLElement).closest(
+      "a[data-element-type='link']",
+    );
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    if (!href) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const openInNewTab = event.metaKey || event.ctrlKey;
+    if (href.startsWith("/") && !openInNewTab) {
+      router.push(href);
+    } else {
+      window.open(href, openInNewTab ? "_blank" : anchor.getAttribute("target") || "_self");
+    }
+  }
+
   const editorElement = (
     <YooptaEditor
       editor={editor}
@@ -69,7 +95,13 @@ export function BlockEditor({
     </YooptaEditor>
   );
 
-  if (readOnly) return editorElement;
+  if (readOnly) {
+    return <div onClickCapture={handleClickCapture}>{editorElement}</div>;
+  }
 
-  return <BlockDndContext editor={editor}>{editorElement}</BlockDndContext>;
+  return (
+    <div onClickCapture={handleClickCapture}>
+      <BlockDndContext editor={editor}>{editorElement}</BlockDndContext>
+    </div>
+  );
 }
