@@ -44,6 +44,21 @@ export async function createPage(parentId: string | null, formData: FormData) {
   redirect(`/data-center/paginas/${created.id}`);
 }
 
+// Variante de createPage para "convertir bloque en página": no redirige (el
+// bloque de origen se reemplaza por un link in-place, sin salir de la
+// página actual) y devuelve el id en vez de una FormData.
+export async function createPageFromBlock(parentId: string, title: string) {
+  const user = await requireUser();
+  const cleanTitle = title.trim().slice(0, 200) || "Sin título";
+
+  const [created] = await db
+    .insert(pages)
+    .values({ userId: user.id, parentId, title: cleanTitle, content: {} })
+    .returning({ id: pages.id });
+
+  return created.id;
+}
+
 export async function updatePage(
   id: string,
   data: { title?: string; content?: YooptaContentValue; icon?: string | null },

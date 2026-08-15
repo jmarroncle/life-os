@@ -22,11 +22,13 @@ export function BlockEditor({
   onChange,
   placeholder = "Escribí algo, o \"# \" para un título, \"- \" para una lista…",
   readOnly = false,
+  onConvertToPage,
 }: {
   initialValue: YooptaContentValue;
   onChange?: (value: YooptaContentValue) => void;
   placeholder?: string;
   readOnly?: boolean;
+  onConvertToPage?: (text: string) => Promise<{ url: string; label: string }>;
 }) {
   const editor = useMemo(
     () => createYooptaEditor({ plugins, marks, value: initialValue, readOnly }),
@@ -54,7 +56,7 @@ export function BlockEditor({
         <>
           <BlockEditorToolbar />
           <BlockEditorSlashMenu />
-          <BlockEditorBlockActions />
+          <BlockEditorBlockActions onConvertToPage={onConvertToPage} />
         </>
       )}
     </YooptaEditor>

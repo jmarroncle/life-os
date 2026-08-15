@@ -11,12 +11,14 @@ export function EntityEditor({
   onSaveTitle,
   onSaveContent,
   extraHeader,
+  onConvertToPage,
 }: {
   initialTitle: string;
   initialContent: YooptaContentValue;
   onSaveTitle: (title: string) => Promise<void>;
   onSaveContent: (content: YooptaContentValue) => Promise<void>;
   extraHeader?: ReactNode;
+  onConvertToPage?: (text: string) => Promise<{ url: string; label: string }>;
 }) {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,7 +52,11 @@ export function EntityEditor({
         </span>
       </div>
       {extraHeader}
-      <BlockEditor initialValue={initialContent} onChange={scheduleContentSave} />
+      <BlockEditor
+        initialValue={initialContent}
+        onChange={scheduleContentSave}
+        onConvertToPage={onConvertToPage}
+      />
     </div>
   );
 }

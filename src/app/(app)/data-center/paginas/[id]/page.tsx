@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createPage, deletePage, getPage, listPages, updatePage } from "../../actions";
+import {
+  createPage,
+  createPageFromBlock,
+  deletePage,
+  getPage,
+  listPages,
+  updatePage,
+} from "../../actions";
 import { EntityEditor } from "@/components/entity-editor";
 import { PageIconPicker } from "@/components/page-icon-picker";
 import {
@@ -45,6 +52,12 @@ export default async function PaginaPage({
     await updatePage(id, { icon });
   }
 
+  async function convertToPage(text: string) {
+    "use server";
+    const newId = await createPageFromBlock(id, text);
+    return { url: `/data-center/paginas/${newId}`, label: text || "Sin título" };
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -86,6 +99,7 @@ export default async function PaginaPage({
         initialContent={(page.content as YooptaContentValue) ?? emptyBlockValue()}
         onSaveTitle={saveTitle}
         onSaveContent={saveContent}
+        onConvertToPage={convertToPage}
       />
 
       <div className="space-y-2 border-t border-neutral-100 pt-4">
