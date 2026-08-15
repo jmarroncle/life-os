@@ -11,6 +11,7 @@ import { plugins, marks } from "@/lib/yoopta-plugins";
 import { BlockEditorToolbar } from "@/components/block-editor-toolbar";
 import { BlockEditorSlashMenu } from "@/components/block-editor-slash-menu";
 import { BlockEditorBlockActions } from "@/components/block-editor-block-actions";
+import { computeGridPlacements } from "@/lib/column-layout";
 
 export type { YooptaContentValue };
 
@@ -77,6 +78,17 @@ export function BlockEditor({
   // solo se pierde la barrita flotante por bloque.
   const perBlockHoverUiEnabled = !readOnly && layout === "normal";
 
+  // El layout de columnas no es un reflow de texto tipo CSS `columns`
+  // (eso balancea por altura total y no garantiza que cada sección
+  // empiece arriba de su propia columna — probado, da resultados
+  // desprolijos). En cambio se calcula, a partir de los HeadingOne, en qué
+  // "pilar" cae cada bloque y se lo posiciona con CSS Grid explícito.
+  const gridPlacements = useMemo(() => {
+    if (layout === "normal") return null;
+    return computeGridPlacements(initialValue, layout === "columns-3" ? 3 : 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout]);
+
   const editorElement = (
     <YooptaEditor
       editor={editor}
@@ -94,7 +106,13 @@ export function BlockEditor({
                 {children}
               </SortableBlock>
             )
-          : undefined
+          : gridPlacements
+            ? ({ children, blockId }) => (
+                <div className="yoopta-grid-cell" style={gridPlacements.get(blockId)}>
+                  {children}
+                </div>
+              )
+            : undefined
       }
     >
       {!readOnly && (

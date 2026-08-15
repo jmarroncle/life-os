@@ -111,35 +111,36 @@ body {
 }
 
 /*
- * Layout de columnas por página (ver pages.layout en el schema). No es un
- * bloque de columnas editable tipo Notion: es un reflow automático vía CSS
- * multi-column sobre el contenido ya existente, cortando una columna nueva
- * antes de cada encabezado (para que cada sección quede agrupada) y evitando
- * partir un bloque individual al medio de una columna.
+ * Layout de columnas por página (ver pages.layout en el schema, y el
+ * agrupamiento en src/lib/column-layout.ts). No es un bloque de columnas
+ * editable tipo Notion: cada bloque se ubica en una celda de CSS Grid
+ * calculada según a qué HeadingOne pertenece — no un reflow de texto tipo
+ * `columns` (ese balancea por altura total, no garantiza que cada sección
+ * arranque arriba de su propia columna). El wrapper de cada bloque (ver
+ * renderBlock en block-editor.tsx) ya trae su gridColumn/gridRow inline;
+ * acá solo se define la grilla en sí.
  */
 .yoopta-editor-columns-2 {
-  column-count: 2;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   column-gap: 2.5rem;
 }
 .yoopta-editor-columns-3 {
-  column-count: 3;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   column-gap: 2rem;
-}
-.yoopta-editor-columns-2 [data-yoopta-block],
-.yoopta-editor-columns-3 [data-yoopta-block] {
-  break-inside: avoid;
-}
-.yoopta-editor-columns-2 [data-element-type="heading-one"],
-.yoopta-editor-columns-3 [data-element-type="heading-one"] {
-  break-before: column;
-}
-.yoopta-editor-columns-2 [data-yoopta-block]:first-child [data-element-type="heading-one"],
-.yoopta-editor-columns-3 [data-yoopta-block]:first-child [data-element-type="heading-one"] {
-  break-before: avoid;
 }
 @media (max-width: 768px) {
   .yoopta-editor-columns-2,
   .yoopta-editor-columns-3 {
-    column-count: 1;
+    grid-template-columns: 1fr;
+  }
+  /* Pisa el gridColumn/gridRow inline (calculado para desktop) para que en
+     mobile todo vuelva al orden natural de arriba a abajo, en vez de
+     encimarse en una sola columna angosta con filas superpuestas. */
+  .yoopta-editor-columns-2 .yoopta-grid-cell,
+  .yoopta-editor-columns-3 .yoopta-grid-cell {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
   }
 }
