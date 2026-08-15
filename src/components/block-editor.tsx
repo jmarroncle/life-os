@@ -65,6 +65,18 @@ export function BlockEditor({
     }
   }
 
+  // El "+/arrastrar/⋯" que aparece al pasar el mouse sobre un bloque usa,
+  // adentro de Yoopta, la posición Y del mouse para decidir qué bloque
+  // está "hovereado" — asume una sola columna de arriba a abajo. Con CSS
+  // multi-column (layout columns-N) varios bloques de columnas distintas
+  // comparten la misma banda Y, así que ese cálculo agarra el bloque
+  // equivocado (confirmado: el menú aparecía sobre otro bloque, y su área
+  // de click de más podía llegar a tapar un link real). Se desactiva ese
+  // hover UI (y el drag-and-drop, que depende del mismo tracking) en
+  // páginas con columnas — se puede seguir editando texto y usando "/",
+  // solo se pierde la barrita flotante por bloque.
+  const perBlockHoverUiEnabled = !readOnly && layout === "normal";
+
   const editorElement = (
     <YooptaEditor
       editor={editor}
@@ -76,26 +88,28 @@ export function BlockEditor({
           : `yoopta-editor-life-os yoopta-editor-${layout}`
       }
       renderBlock={
-        readOnly
-          ? undefined
-          : ({ children, blockId }) => (
+        perBlockHoverUiEnabled
+          ? ({ children, blockId }) => (
               <SortableBlock id={blockId} useDragHandle>
                 {children}
               </SortableBlock>
             )
+          : undefined
       }
     >
       {!readOnly && (
         <>
           <BlockEditorToolbar />
           <BlockEditorSlashMenu />
-          <BlockEditorBlockActions onConvertToPage={onConvertToPage} />
+          {perBlockHoverUiEnabled && (
+            <BlockEditorBlockActions onConvertToPage={onConvertToPage} />
+          )}
         </>
       )}
     </YooptaEditor>
   );
 
-  if (readOnly) {
+  if (!perBlockHoverUiEnabled) {
     return <div onClickCapture={handleClickCapture}>{editorElement}</div>;
   }
 
