@@ -330,6 +330,32 @@ export const databaseRows = lifeOs.table(
   (table) => [index("database_rows_database_id_idx").on(table.databaseId)],
 );
 
+// --- Deshacer ---
+// Un log de acciones reversibles, compartido por todos los módulos. Cada
+// fila es una acción de usuario (crear/editar/eliminar algo) guardada como
+// una lista ordenada de operaciones inversas ya resueltas (ver
+// src/lib/undo.ts) — "Deshacer" simplemente ejecuta la entrada no
+// deshecha más reciente y la marca como usada. No es un historial completo
+// tipo Ctrl+Z (no hay redo), es una red de seguridad de un solo paso hacia
+// atrás por click, repetible.
+
+export const undoLog = lifeOs.table(
+  "undo_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    inverseOps: jsonb("inverse_ops").notNull(),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("undo_log_user_id_idx").on(table.userId)],
+);
+
 // --- Google Calendar ---
 // Un solo usuario por ahora, así que una fila por user_id alcanza.
 

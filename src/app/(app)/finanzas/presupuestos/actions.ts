@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { budgets, categories, transactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { parseAmountToCents } from "@/lib/money";
+import { logUndo, omitId } from "@/lib/undo";
 
 export async function getBudgetSummary(month: string) {
   const user = await requireUser();
@@ -56,11 +57,34 @@ export async function setBudget(formData: FormData) {
   );
   if (!categoryId || !month) return;
 
-  await db
+  const [existing] = await db
+    .select()
+    .from(budgets)
+    .where(
+      and(
+        eq(budgets.userId, user.id),
+        eq(budgets.categoryId, categoryId),
+        eq(budgets.month, month),
+      ),
+    )
+    .limit(1);
+
+  const [result] = await db
     .insert(budgets)
     .values({ userId: user.id, categoryId, month, limitCents })
     .onConflictDoUpdate({
       target: [budgets.userId, budgets.categoryId, budgets.month],
       set: { limitCents },
-    });
+    })
+    .returning({ id: budgets.id });
+
+  if (existing) {
+    await logUndo(user.id, `Editar presupuesto de ${month}`, [
+      { op: "update", table: "budgets", id: existing.id, values: omitId(existing) },
+    ]);
+  } else {
+    await logUndo(user.id, `Crear presupuesto de ${month}`, [
+      { op: "delete", table: "budgets", id: result.id },
+    ]);
+  }
 }

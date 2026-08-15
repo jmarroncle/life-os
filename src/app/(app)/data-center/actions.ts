@@ -5,7 +5,36 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { pageLayout, pages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { logUndo, omitId, type InverseOp } from "@/lib/undo";
 import type { YooptaContentValue } from "@/components/block-editor";
+
+// Junta una página y todos sus descendientes (BFS, padre antes que hijos)
+// para poder deshacer un delete: el borrado de pages hace cascade sobre
+// parentId, así que sin esto un "deshacer" solo recuperaría la página raíz
+// del árbol borrado, no sus subpáginas.
+async function collectPageSubtree(rootId: string, userId: string) {
+  const all = await db.select().from(pages).where(eq(pages.userId, userId));
+  const byParent = new Map<string, typeof all>();
+  for (const page of all) {
+    const key = page.parentId ?? "";
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(page);
+  }
+
+  const root = all.find((page) => page.id === rootId);
+  if (!root) return [];
+
+  const result = [root];
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const child of byParent.get(current) ?? []) {
+      result.push(child);
+      queue.push(child.id);
+    }
+  }
+  return result;
+}
 
 export type PageLayout = (typeof pageLayout.enumValues)[number];
 
@@ -43,6 +72,10 @@ export async function createPage(parentId: string | null, formData: FormData) {
     .values({ userId: user.id, parentId, title, content: {} })
     .returning({ id: pages.id });
 
+  await logUndo(user.id, `Crear página "${title}"`, [
+    { op: "delete", table: "pages", id: created.id },
+  ]);
+
   redirect(`/data-center/paginas/${created.id}`);
 }
 
@@ -58,6 +91,10 @@ export async function createPageFromBlock(parentId: string, title: string) {
     .values({ userId: user.id, parentId, title: cleanTitle, content: {} })
     .returning({ id: pages.id });
 
+  await logUndo(user.id, `Crear página "${cleanTitle}"`, [
+    { op: "delete", table: "pages", id: created.id },
+  ]);
+
   return created.id;
 }
 
@@ -71,10 +108,21 @@ export async function updatePage(
   },
 ) {
   const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(pages)
+    .where(and(eq(pages.id, id), eq(pages.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .update(pages)
     .set({ ...data, updatedAt: new Date() })
     .where(and(eq(pages.id, id), eq(pages.userId, user.id)));
+
+  await logUndo(user.id, `Editar página "${before.title}"`, [
+    { op: "update", table: "pages", id, values: omitId(before) },
+  ]);
 }
 
 export async function movePage(id: string, newParentId: string | null) {
@@ -102,18 +150,41 @@ export async function movePage(id: string, newParentId: string | null) {
     }
   }
 
+  const [before] = await db
+    .select()
+    .from(pages)
+    .where(and(eq(pages.id, id), eq(pages.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .update(pages)
     .set({ parentId: newParentId, updatedAt: new Date() })
     .where(and(eq(pages.id, id), eq(pages.userId, user.id)));
+
+  await logUndo(user.id, `Mover página "${before.title}"`, [
+    { op: "update", table: "pages", id, values: omitId(before) },
+  ]);
 }
 
 export async function deletePage(id: string) {
   const user = await requireUser();
+  const subtree = await collectPageSubtree(id, user.id);
+  if (subtree.length === 0) return;
+
   const [deleted] = await db
     .delete(pages)
     .where(and(eq(pages.id, id), eq(pages.userId, user.id)))
     .returning({ parentId: pages.parentId });
+
+  if (deleted) {
+    const inverseOps: InverseOp[] = subtree.map((page) => ({
+      op: "insert",
+      table: "pages",
+      values: page,
+    }));
+    await logUndo(user.id, `Eliminar página "${subtree[0].title}"`, inverseOps);
+  }
 
   redirect(
     deleted?.parentId
@@ -127,9 +198,15 @@ export async function createPageWithContent(
   content: YooptaContentValue,
 ) {
   const user = await requireUser();
+  const cleanTitle = title || "Sin título";
   const [created] = await db
     .insert(pages)
-    .values({ userId: user.id, title: title || "Sin título", content })
+    .values({ userId: user.id, title: cleanTitle, content })
     .returning({ id: pages.id });
+
+  await logUndo(user.id, `Crear página "${cleanTitle}"`, [
+    { op: "delete", table: "pages", id: created.id },
+  ]);
+
   return created.id;
 }

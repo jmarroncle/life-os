@@ -10,6 +10,7 @@ import {
   type databaseColumnType,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { logUndo, omitId, type InverseOp } from "@/lib/undo";
 
 export type DatabaseColumnType = (typeof databaseColumnType.enumValues)[number];
 
@@ -33,14 +34,39 @@ export async function createDatabase(formData: FormData) {
     .values({ userId: user.id, name, icon })
     .returning({ id: databases.id });
 
+  await logUndo(user.id, `Crear base "${name}"`, [
+    { op: "delete", table: "databases", id: created.id },
+  ]);
+
   redirect(`/bases/${created.id}`);
 }
 
 export async function deleteDatabase(id: string) {
   const user = await requireUser();
+
+  const [database] = await db
+    .select()
+    .from(databases)
+    .where(and(eq(databases.id, id), eq(databases.userId, user.id)))
+    .limit(1);
+  if (!database) redirect("/bases");
+
+  const [columns, rows] = await Promise.all([
+    db.select().from(databaseColumns).where(eq(databaseColumns.databaseId, id)),
+    db.select().from(databaseRows).where(eq(databaseRows.databaseId, id)),
+  ]);
+
   await db
     .delete(databases)
     .where(and(eq(databases.id, id), eq(databases.userId, user.id)));
+
+  const inverseOps: InverseOp[] = [
+    { op: "insert", table: "databases", values: database },
+    ...columns.map((column): InverseOp => ({ op: "insert", table: "databaseColumns", values: column })),
+    ...rows.map((row): InverseOp => ({ op: "insert", table: "databaseRows", values: row })),
+  ];
+  await logUndo(user.id, `Eliminar base "${database.name}"`, inverseOps);
+
   redirect("/bases");
 }
 
@@ -88,21 +114,39 @@ export async function addColumn(databaseId: string, formData: FormData) {
     .from(databaseColumns)
     .where(eq(databaseColumns.databaseId, databaseId));
 
-  await db.insert(databaseColumns).values({
-    databaseId,
-    userId: user.id,
-    name,
-    type,
-    options,
-    position: count,
-  });
+  const [created] = await db
+    .insert(databaseColumns)
+    .values({
+      databaseId,
+      userId: user.id,
+      name,
+      type,
+      options,
+      position: count,
+    })
+    .returning({ id: databaseColumns.id });
+
+  await logUndo(user.id, `Crear columna "${name}"`, [
+    { op: "delete", table: "databaseColumns", id: created.id },
+  ]);
 }
 
 export async function deleteColumn(columnId: string) {
   const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(databaseColumns)
+    .where(and(eq(databaseColumns.id, columnId), eq(databaseColumns.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .delete(databaseColumns)
     .where(and(eq(databaseColumns.id, columnId), eq(databaseColumns.userId, user.id)));
+
+  await logUndo(user.id, `Eliminar columna "${before.name}"`, [
+    { op: "insert", table: "databaseColumns", values: before },
+  ]);
 }
 
 function parseRowValues(
@@ -137,11 +181,18 @@ export async function addRow(
   const user = await requireUser();
   const values = parseRowValues(formData, columns);
 
-  await db.insert(databaseRows).values({
-    databaseId,
-    userId: user.id,
-    values,
-  });
+  const [created] = await db
+    .insert(databaseRows)
+    .values({
+      databaseId,
+      userId: user.id,
+      values,
+    })
+    .returning({ id: databaseRows.id });
+
+  await logUndo(user.id, "Crear fila", [
+    { op: "delete", table: "databaseRows", id: created.id },
+  ]);
 }
 
 export async function updateRow(
@@ -152,15 +203,37 @@ export async function updateRow(
   const user = await requireUser();
   const values = parseRowValues(formData, columns);
 
+  const [before] = await db
+    .select()
+    .from(databaseRows)
+    .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .update(databaseRows)
     .set({ values, updatedAt: new Date() })
     .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, user.id)));
+
+  await logUndo(user.id, "Editar fila", [
+    { op: "update", table: "databaseRows", id: rowId, values: omitId(before) },
+  ]);
 }
 
 export async function deleteRow(rowId: string) {
   const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(databaseRows)
+    .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .delete(databaseRows)
     .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, user.id)));
+
+  await logUndo(user.id, "Eliminar fila", [
+    { op: "insert", table: "databaseRows", values: before },
+  ]);
 }

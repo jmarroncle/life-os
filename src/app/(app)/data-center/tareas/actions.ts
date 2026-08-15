@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { projects, tasks, taskStatus } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { logUndo, omitId } from "@/lib/undo";
 
 export type TaskStatus = (typeof taskStatus.enumValues)[number];
 
@@ -41,7 +42,14 @@ export async function createProject(formData: FormData) {
   if (!name) return;
   const githubRepo = String(formData.get("githubRepo") ?? "").trim() || null;
 
-  await db.insert(projects).values({ userId: user.id, name, githubRepo });
+  const [created] = await db
+    .insert(projects)
+    .values({ userId: user.id, name, githubRepo })
+    .returning({ id: projects.id });
+
+  await logUndo(user.id, `Crear proyecto "${name}"`, [
+    { op: "delete", table: "projects", id: created.id },
+  ]);
 }
 
 export async function setProjectRepo(formData: FormData) {
@@ -50,10 +58,21 @@ export async function setProjectRepo(formData: FormData) {
   const githubRepo = String(formData.get("githubRepo") ?? "").trim() || null;
   if (!projectId) return;
 
+  const [before] = await db
+    .select()
+    .from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .update(projects)
     .set({ githubRepo })
     .where(and(eq(projects.id, projectId), eq(projects.userId, user.id)));
+
+  await logUndo(user.id, `Editar proyecto "${before.name}"`, [
+    { op: "update", table: "projects", id: projectId, values: omitId(before) },
+  ]);
 }
 
 export async function createTask(formData: FormData) {
@@ -64,25 +83,54 @@ export async function createTask(formData: FormData) {
   const projectId = String(formData.get("projectId") ?? "") || null;
   const dueDateRaw = String(formData.get("dueDate") ?? "");
 
-  await db.insert(tasks).values({
-    userId: user.id,
-    title,
-    projectId,
-    dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
-  });
+  const [created] = await db
+    .insert(tasks)
+    .values({
+      userId: user.id,
+      title,
+      projectId,
+      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+    })
+    .returning({ id: tasks.id });
+
+  await logUndo(user.id, `Crear tarea "${title}"`, [
+    { op: "delete", table: "tasks", id: created.id },
+  ]);
 }
 
 export async function updateTaskStatus(id: string, status: TaskStatus) {
   const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .update(tasks)
     .set({ status, updatedAt: new Date() })
     .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)));
+
+  await logUndo(user.id, `Cambiar estado de tarea "${before.title}"`, [
+    { op: "update", table: "tasks", id, values: omitId(before) },
+  ]);
 }
 
 export async function deleteTask(id: string) {
   const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .delete(tasks)
     .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)));
+
+  await logUndo(user.id, `Eliminar tarea "${before.title}"`, [
+    { op: "insert", table: "tasks", values: before },
+  ]);
 }

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { accounts, categories, transactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { parseAmountToCents } from "@/lib/money";
+import { logUndo } from "@/lib/undo";
 
 export async function listTransactions() {
   const user = await requireUser();
@@ -41,19 +42,39 @@ export async function createTransaction(formData: FormData) {
   const dateRaw = String(formData.get("date") ?? "");
   const occurredAt = dateRaw ? new Date(dateRaw) : new Date();
 
-  await db.insert(transactions).values({
-    userId: user.id,
-    accountId,
-    categoryId,
-    amountCents,
-    description,
-    occurredAt,
-  });
+  const [created] = await db
+    .insert(transactions)
+    .values({
+      userId: user.id,
+      accountId,
+      categoryId,
+      amountCents,
+      description,
+      occurredAt,
+    })
+    .returning({ id: transactions.id });
+
+  await logUndo(user.id, `Crear movimiento${description ? ` "${description}"` : ""}`, [
+    { op: "delete", table: "transactions", id: created.id },
+  ]);
 }
 
 export async function deleteTransaction(id: string) {
   const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.id, id), eq(transactions.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
   await db
     .delete(transactions)
     .where(and(eq(transactions.id, id), eq(transactions.userId, user.id)));
+
+  await logUndo(
+    user.id,
+    `Eliminar movimiento${before.description ? ` "${before.description}"` : ""}`,
+    [{ op: "insert", table: "transactions", values: before }],
+  );
 }

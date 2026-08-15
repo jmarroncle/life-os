@@ -10,6 +10,7 @@ import {
   type categoryKind,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import { logUndo } from "@/lib/undo";
 
 export type AccountType = (typeof accountType.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];
@@ -29,7 +30,14 @@ export async function createAccount(formData: FormData) {
   if (!name) return;
   const type = String(formData.get("type") ?? "bank") as AccountType;
 
-  await db.insert(accounts).values({ userId: user.id, name, type });
+  const [created] = await db
+    .insert(accounts)
+    .values({ userId: user.id, name, type })
+    .returning({ id: accounts.id });
+
+  await logUndo(user.id, `Crear cuenta "${name}"`, [
+    { op: "delete", table: "accounts", id: created.id },
+  ]);
 }
 
 export async function listCategories(kind?: CategoryKind) {
@@ -48,7 +56,14 @@ export async function createCategory(formData: FormData) {
   if (!name) return;
   const kind = String(formData.get("kind") ?? "expense") as CategoryKind;
 
-  await db.insert(categories).values({ userId: user.id, name, kind });
+  const [created] = await db
+    .insert(categories)
+    .values({ userId: user.id, name, kind })
+    .returning({ id: categories.id });
+
+  await logUndo(user.id, `Crear categoría "${name}"`, [
+    { op: "delete", table: "categories", id: created.id },
+  ]);
 }
 
 export async function getMonthSummary(month: string) {
