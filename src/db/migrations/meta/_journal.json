@@ -71,6 +71,13 @@
       "when": 1786759802822,
       "tag": "0009_chief_lord_tyger",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786770428428,
+      "tag": "0010_fluffy_firestar",
+      "breakpoints": true
     }
   ]
 }

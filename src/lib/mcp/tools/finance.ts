@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { db } from "@/db";
 import { accounts, categories, transactions } from "@/db/schema";
-import { errorResult, jsonResult, withUser } from "@/lib/mcp/tool-helpers";
+import { errorResult, jsonResult, withLogging, withUser } from "@/lib/mcp/tool-helpers";
 import { currentMonth, formatCents } from "@/lib/money";
 
 export function registerFinanceTools(server: McpServer) {
@@ -21,13 +21,16 @@ export function registerFinanceTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async (_args: Record<string, never>, userId) => {
-      const rows = await db
-        .select()
-        .from(accounts)
-        .where(eq(accounts.userId, userId));
-      return jsonResult(`${rows.length} cuenta(s).`, { accounts: rows });
-    }),
+    withLogging(
+      "life_os_list_accounts",
+      withUser(async (_args: Record<string, never>, userId) => {
+        const rows = await db
+          .select()
+          .from(accounts)
+          .where(eq(accounts.userId, userId));
+        return jsonResult(`${rows.length} cuenta(s).`, { accounts: rows });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -43,13 +46,16 @@ export function registerFinanceTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async (_args: Record<string, never>, userId) => {
-      const rows = await db
-        .select()
-        .from(categories)
-        .where(eq(categories.userId, userId));
-      return jsonResult(`${rows.length} categoría(s).`, { categories: rows });
-    }),
+    withLogging(
+      "life_os_list_categories",
+      withUser(async (_args: Record<string, never>, userId) => {
+        const rows = await db
+          .select()
+          .from(categories)
+          .where(eq(categories.userId, userId));
+        return jsonResult(`${rows.length} categoría(s).`, { categories: rows });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -72,52 +78,55 @@ export function registerFinanceTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ month }: { month?: string }, userId) => {
-      const targetMonth = month ?? currentMonth();
+    withLogging(
+      "life_os_get_finance_summary",
+      withUser(async ({ month }: { month?: string }, userId) => {
+        const targetMonth = month ?? currentMonth();
 
-      const rows = await db
-        .select({
-          categoryName: categories.name,
-          amountCents: transactions.amountCents,
-        })
-        .from(transactions)
-        .leftJoin(categories, eq(transactions.categoryId, categories.id))
-        .where(
-          and(
-            eq(transactions.userId, userId),
-            sql`to_char(${transactions.occurredAt}, 'YYYY-MM') = ${targetMonth}`,
-          ),
-        );
+        const rows = await db
+          .select({
+            categoryName: categories.name,
+            amountCents: transactions.amountCents,
+          })
+          .from(transactions)
+          .leftJoin(categories, eq(transactions.categoryId, categories.id))
+          .where(
+            and(
+              eq(transactions.userId, userId),
+              sql`to_char(${transactions.occurredAt}, 'YYYY-MM') = ${targetMonth}`,
+            ),
+          );
 
-      let incomeCents = 0;
-      let expenseCents = 0;
-      const byCategory = new Map<string, number>();
-      for (const row of rows) {
-        if (row.amountCents > 0) {
-          incomeCents += row.amountCents;
-        } else {
-          const spent = -row.amountCents;
-          expenseCents += spent;
-          const key = row.categoryName ?? "Sin categoría";
-          byCategory.set(key, (byCategory.get(key) ?? 0) + spent);
+        let incomeCents = 0;
+        let expenseCents = 0;
+        const byCategory = new Map<string, number>();
+        for (const row of rows) {
+          if (row.amountCents > 0) {
+            incomeCents += row.amountCents;
+          } else {
+            const spent = -row.amountCents;
+            expenseCents += spent;
+            const key = row.categoryName ?? "Sin categoría";
+            byCategory.set(key, (byCategory.get(key) ?? 0) + spent);
+          }
         }
-      }
 
-      const categoryBreakdown = Array.from(byCategory.entries())
-        .map(([name, cents]) => ({ name, amount: formatCents(cents), cents }))
-        .sort((a, b) => b.cents - a.cents);
+        const categoryBreakdown = Array.from(byCategory.entries())
+          .map(([name, cents]) => ({ name, amount: formatCents(cents), cents }))
+          .sort((a, b) => b.cents - a.cents);
 
-      return jsonResult(
-        `Resumen de ${targetMonth}: ingresos ${formatCents(incomeCents)}, gastos ${formatCents(expenseCents)}.`,
-        {
-          month: targetMonth,
-          incomeCents,
-          expenseCents,
-          balanceCents: incomeCents - expenseCents,
-          categoryBreakdown,
-        },
-      );
-    }),
+        return jsonResult(
+          `Resumen de ${targetMonth}: ingresos ${formatCents(incomeCents)}, gastos ${formatCents(expenseCents)}.`,
+          {
+            month: targetMonth,
+            incomeCents,
+            expenseCents,
+            balanceCents: incomeCents - expenseCents,
+            categoryBreakdown,
+          },
+        );
+      }),
+    ),
   );
 
   server.registerTool(
@@ -135,25 +144,28 @@ export function registerFinanceTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ limit }: { limit: number }, userId) => {
-      const rows = await db
-        .select({
-          id: transactions.id,
-          amountCents: transactions.amountCents,
-          description: transactions.description,
-          occurredAt: transactions.occurredAt,
-          accountId: transactions.accountId,
-          categoryId: transactions.categoryId,
-        })
-        .from(transactions)
-        .where(eq(transactions.userId, userId))
-        .orderBy(desc(transactions.occurredAt))
-        .limit(limit);
+    withLogging(
+      "life_os_list_transactions",
+      withUser(async ({ limit }: { limit: number }, userId) => {
+        const rows = await db
+          .select({
+            id: transactions.id,
+            amountCents: transactions.amountCents,
+            description: transactions.description,
+            occurredAt: transactions.occurredAt,
+            accountId: transactions.accountId,
+            categoryId: transactions.categoryId,
+          })
+          .from(transactions)
+          .where(eq(transactions.userId, userId))
+          .orderBy(desc(transactions.occurredAt))
+          .limit(limit);
 
-      return jsonResult(`${rows.length} movimiento(s).`, {
-        transactions: rows,
-      });
-    }),
+        return jsonResult(`${rows.length} movimiento(s).`, {
+          transactions: rows,
+        });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -190,47 +202,50 @@ export function registerFinanceTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        {
-          accountId,
-          amount,
-          categoryId,
-          description,
-          occurredAt,
-        }: {
-          accountId: string;
-          amount: number;
-          categoryId?: string;
-          description?: string;
-          occurredAt?: string;
-        },
-        userId,
-      ) => {
-        const [account] = await db
-          .select({ id: accounts.id })
-          .from(accounts)
-          .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
-          .limit(1);
-        if (!account) return errorResult(`No se encontró la cuenta ${accountId}.`);
-
-        const amountCents = Math.round(amount * 100);
-        const [created] = await db
-          .insert(transactions)
-          .values({
-            userId,
+    withLogging(
+      "life_os_create_transaction",
+      withUser(
+        async (
+          {
             accountId,
-            categoryId: categoryId ?? null,
-            amountCents,
-            description: description ?? null,
-            occurredAt: occurredAt ? new Date(occurredAt) : new Date(),
-          })
-          .returning({ id: transactions.id });
+            amount,
+            categoryId,
+            description,
+            occurredAt,
+          }: {
+            accountId: string;
+            amount: number;
+            categoryId?: string;
+            description?: string;
+            occurredAt?: string;
+          },
+          userId,
+        ) => {
+          const [account] = await db
+            .select({ id: accounts.id })
+            .from(accounts)
+            .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+            .limit(1);
+          if (!account) return errorResult(`No se encontró la cuenta ${accountId}.`);
 
-        return jsonResult(`Movimiento de ${formatCents(amountCents)} registrado.`, {
-          id: created.id,
-        });
-      },
+          const amountCents = Math.round(amount * 100);
+          const [created] = await db
+            .insert(transactions)
+            .values({
+              userId,
+              accountId,
+              categoryId: categoryId ?? null,
+              amountCents,
+              description: description ?? null,
+              occurredAt: occurredAt ? new Date(occurredAt) : new Date(),
+            })
+            .returning({ id: transactions.id });
+
+          return jsonResult(`Movimiento de ${formatCents(amountCents)} registrado.`, {
+            id: created.id,
+          });
+        },
+      ),
     ),
   );
 }

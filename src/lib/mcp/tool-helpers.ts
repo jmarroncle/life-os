@@ -1,4 +1,5 @@
 import type { ServerContext } from "@modelcontextprotocol/server";
+import { logMcpCall } from "@/lib/mcp/log-call";
 
 export type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -43,5 +44,30 @@ export function withUser<Args>(
         error instanceof Error ? error.message : String(error),
       );
     }
+  };
+}
+
+// Envuelve un handler ya armado con withUser() y registra la llamada en
+// mcp_calls (duración, éxito, tokens estimados) — ver src/lib/mcp/log-call.ts.
+// Un fallo al loguear nunca debe tirar abajo la respuesta real de la tool,
+// por eso el catch silencioso: la auditoría es best-effort, no una garantía.
+export function withLogging<Args>(
+  toolName: string,
+  fn: (args: Args, ctx: ServerContext) => Promise<ToolResult>,
+) {
+  return async (args: Args, ctx: ServerContext): Promise<ToolResult> => {
+    const start = Date.now();
+    const result = await fn(args, ctx);
+    const userId = ctx.http?.authInfo?.extra?.userId;
+    if (typeof userId === "string" && userId) {
+      logMcpCall({
+        userId,
+        toolName,
+        args,
+        result,
+        durationMs: Date.now() - start,
+      }).catch(() => {});
+    }
+    return result;
   };
 }

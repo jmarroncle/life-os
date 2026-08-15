@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { db } from "@/db";
 import { notes } from "@/db/schema";
-import { errorResult, jsonResult, withUser } from "@/lib/mcp/tool-helpers";
+import { errorResult, jsonResult, withLogging, withUser } from "@/lib/mcp/tool-helpers";
 import { buildSimpleContent, extractPlainText } from "@/lib/mcp/block-content";
 
 export function registerNoteTools(server: McpServer) {
@@ -23,30 +23,33 @@ export function registerNoteTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ query }: { query?: string }, userId) => {
-      const conditions = [eq(notes.userId, userId)];
-      if (query) {
-        conditions.push(
-          or(
-            ilike(notes.title, `%${query}%`),
-            sql`exists (select 1 from unnest(${notes.tags}) tag where tag ilike ${`%${query}%`})`,
-          )!,
-        );
-      }
+    withLogging(
+      "life_os_list_notes",
+      withUser(async ({ query }: { query?: string }, userId) => {
+        const conditions = [eq(notes.userId, userId)];
+        if (query) {
+          conditions.push(
+            or(
+              ilike(notes.title, `%${query}%`),
+              sql`exists (select 1 from unnest(${notes.tags}) tag where tag ilike ${`%${query}%`})`,
+            )!,
+          );
+        }
 
-      const rows = await db
-        .select({
-          id: notes.id,
-          title: notes.title,
-          tags: notes.tags,
-          updatedAt: notes.updatedAt,
-        })
-        .from(notes)
-        .where(and(...conditions))
-        .orderBy(desc(notes.updatedAt));
+        const rows = await db
+          .select({
+            id: notes.id,
+            title: notes.title,
+            tags: notes.tags,
+            updatedAt: notes.updatedAt,
+          })
+          .from(notes)
+          .where(and(...conditions))
+          .orderBy(desc(notes.updatedAt));
 
-      return jsonResult(`${rows.length} nota(s).`, { notes: rows });
-    }),
+        return jsonResult(`${rows.length} nota(s).`, { notes: rows });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -62,22 +65,25 @@ export function registerNoteTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ id }: { id: string }, userId) => {
-      const [note] = await db
-        .select()
-        .from(notes)
-        .where(and(eq(notes.id, id), eq(notes.userId, userId)))
-        .limit(1);
+    withLogging(
+      "life_os_get_note",
+      withUser(async ({ id }: { id: string }, userId) => {
+        const [note] = await db
+          .select()
+          .from(notes)
+          .where(and(eq(notes.id, id), eq(notes.userId, userId)))
+          .limit(1);
 
-      if (!note) return errorResult(`No se encontró la nota ${id}.`);
+        if (!note) return errorResult(`No se encontró la nota ${id}.`);
 
-      return jsonResult(`Nota "${note.title}".`, {
-        id: note.id,
-        title: note.title,
-        tags: note.tags,
-        content: extractPlainText(note.content),
-      });
-    }),
+        return jsonResult(`Nota "${note.title}".`, {
+          id: note.id,
+          title: note.title,
+          tags: note.tags,
+          content: extractPlainText(note.content),
+        });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -100,23 +106,26 @@ export function registerNoteTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        { title, content, tags }: { title: string; content?: string; tags?: string[] },
-        userId,
-      ) => {
-        const [created] = await db
-          .insert(notes)
-          .values({
-            userId,
-            title,
-            content: buildSimpleContent(content ?? ""),
-            tags: tags ?? [],
-          })
-          .returning({ id: notes.id });
+    withLogging(
+      "life_os_create_note",
+      withUser(
+        async (
+          { title, content, tags }: { title: string; content?: string; tags?: string[] },
+          userId,
+        ) => {
+          const [created] = await db
+            .insert(notes)
+            .values({
+              userId,
+              title,
+              content: buildSimpleContent(content ?? ""),
+              tags: tags ?? [],
+            })
+            .returning({ id: notes.id });
 
-        return jsonResult(`Nota "${title}" creada.`, { id: created.id });
-      },
+          return jsonResult(`Nota "${title}" creada.`, { id: created.id });
+        },
+      ),
     ),
   );
 
@@ -133,16 +142,19 @@ export function registerNoteTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ id }: { id: string }, userId) => {
-      const result = await db
-        .delete(notes)
-        .where(and(eq(notes.id, id), eq(notes.userId, userId)))
-        .returning({ id: notes.id });
+    withLogging(
+      "life_os_delete_note",
+      withUser(async ({ id }: { id: string }, userId) => {
+        const result = await db
+          .delete(notes)
+          .where(and(eq(notes.id, id), eq(notes.userId, userId)))
+          .returning({ id: notes.id });
 
-      if (result.length === 0) {
-        return errorResult(`No se encontró la nota ${id}.`);
-      }
-      return jsonResult(`Nota ${id} eliminada.`, { id });
-    }),
+        if (result.length === 0) {
+          return errorResult(`No se encontró la nota ${id}.`);
+        }
+        return jsonResult(`Nota ${id} eliminada.`, { id });
+      }),
+    ),
   );
 }

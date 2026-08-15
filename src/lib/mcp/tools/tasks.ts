@@ -3,7 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { db } from "@/db";
 import { projects, tasks, taskStatus } from "@/db/schema";
-import { errorResult, jsonResult, withUser } from "@/lib/mcp/tool-helpers";
+import { errorResult, jsonResult, withLogging, withUser } from "@/lib/mcp/tool-helpers";
 
 const StatusEnum = z.enum(taskStatus.enumValues);
 
@@ -26,34 +26,37 @@ export function registerTaskTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        { status }: { status?: (typeof taskStatus.enumValues)[number] },
-        userId,
-      ) => {
-        const conditions = [eq(tasks.userId, userId)];
-        if (status) conditions.push(eq(tasks.status, status));
+    withLogging(
+      "life_os_list_tasks",
+      withUser(
+        async (
+          { status }: { status?: (typeof taskStatus.enumValues)[number] },
+          userId,
+        ) => {
+          const conditions = [eq(tasks.userId, userId)];
+          if (status) conditions.push(eq(tasks.status, status));
 
-        const rows = await db
-          .select({
-            id: tasks.id,
-            title: tasks.title,
-            description: tasks.description,
-            status: tasks.status,
-            dueDate: tasks.dueDate,
-            projectId: tasks.projectId,
-            projectName: projects.name,
-            prUrl: tasks.prUrl,
-          })
-          .from(tasks)
-          .leftJoin(projects, eq(tasks.projectId, projects.id))
-          .where(and(...conditions))
-          .orderBy(asc(tasks.position), asc(tasks.createdAt));
+          const rows = await db
+            .select({
+              id: tasks.id,
+              title: tasks.title,
+              description: tasks.description,
+              status: tasks.status,
+              dueDate: tasks.dueDate,
+              projectId: tasks.projectId,
+              projectName: projects.name,
+              prUrl: tasks.prUrl,
+            })
+            .from(tasks)
+            .leftJoin(projects, eq(tasks.projectId, projects.id))
+            .where(and(...conditions))
+            .orderBy(asc(tasks.position), asc(tasks.createdAt));
 
-        return jsonResult(`${rows.length} tarea(s) encontrada(s).`, {
-          tasks: rows,
-        });
-      },
+          return jsonResult(`${rows.length} tarea(s) encontrada(s).`, {
+            tasks: rows,
+          });
+        },
+      ),
     ),
   );
 
@@ -85,34 +88,37 @@ export function registerTaskTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        {
-          title,
-          description,
-          projectId,
-          dueDate,
-        }: {
-          title: string;
-          description?: string;
-          projectId?: string;
-          dueDate?: string;
-        },
-        userId,
-      ) => {
-        const [created] = await db
-          .insert(tasks)
-          .values({
-            userId,
+    withLogging(
+      "life_os_create_task",
+      withUser(
+        async (
+          {
             title,
-            description: description ?? null,
-            projectId: projectId ?? null,
-            dueDate: dueDate ? new Date(dueDate) : null,
-          })
-          .returning({ id: tasks.id });
+            description,
+            projectId,
+            dueDate,
+          }: {
+            title: string;
+            description?: string;
+            projectId?: string;
+            dueDate?: string;
+          },
+          userId,
+        ) => {
+          const [created] = await db
+            .insert(tasks)
+            .values({
+              userId,
+              title,
+              description: description ?? null,
+              projectId: projectId ?? null,
+              dueDate: dueDate ? new Date(dueDate) : null,
+            })
+            .returning({ id: tasks.id });
 
-        return jsonResult(`Tarea "${title}" creada.`, { id: created.id });
-      },
+          return jsonResult(`Tarea "${title}" creada.`, { id: created.id });
+        },
+      ),
     ),
   );
 
@@ -141,45 +147,48 @@ export function registerTaskTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        {
-          id,
-          title,
-          description,
-          status,
-          projectId,
-          dueDate,
-        }: {
-          id: string;
-          title?: string;
-          description?: string;
-          status?: (typeof taskStatus.enumValues)[number];
-          projectId?: string | null;
-          dueDate?: string | null;
+    withLogging(
+      "life_os_update_task",
+      withUser(
+        async (
+          {
+            id,
+            title,
+            description,
+            status,
+            projectId,
+            dueDate,
+          }: {
+            id: string;
+            title?: string;
+            description?: string;
+            status?: (typeof taskStatus.enumValues)[number];
+            projectId?: string | null;
+            dueDate?: string | null;
+          },
+          userId,
+        ) => {
+          const updates: Record<string, unknown> = { updatedAt: new Date() };
+          if (title !== undefined) updates.title = title;
+          if (description !== undefined) updates.description = description;
+          if (status !== undefined) updates.status = status;
+          if (projectId !== undefined) updates.projectId = projectId;
+          if (dueDate !== undefined) {
+            updates.dueDate = dueDate ? new Date(dueDate) : null;
+          }
+
+          const result = await db
+            .update(tasks)
+            .set(updates)
+            .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+            .returning({ id: tasks.id });
+
+          if (result.length === 0) {
+            return errorResult(`No se encontró la tarea ${id}.`);
+          }
+          return jsonResult(`Tarea ${id} actualizada.`, { id });
         },
-        userId,
-      ) => {
-        const updates: Record<string, unknown> = { updatedAt: new Date() };
-        if (title !== undefined) updates.title = title;
-        if (description !== undefined) updates.description = description;
-        if (status !== undefined) updates.status = status;
-        if (projectId !== undefined) updates.projectId = projectId;
-        if (dueDate !== undefined) {
-          updates.dueDate = dueDate ? new Date(dueDate) : null;
-        }
-
-        const result = await db
-          .update(tasks)
-          .set(updates)
-          .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-          .returning({ id: tasks.id });
-
-        if (result.length === 0) {
-          return errorResult(`No se encontró la tarea ${id}.`);
-        }
-        return jsonResult(`Tarea ${id} actualizada.`, { id });
-      },
+      ),
     ),
   );
 
@@ -198,17 +207,20 @@ export function registerTaskTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ id }: { id: string }, userId) => {
-      const result = await db
-        .delete(tasks)
-        .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
-        .returning({ id: tasks.id });
+    withLogging(
+      "life_os_delete_task",
+      withUser(async ({ id }: { id: string }, userId) => {
+        const result = await db
+          .delete(tasks)
+          .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+          .returning({ id: tasks.id });
 
-      if (result.length === 0) {
-        return errorResult(`No se encontró la tarea ${id}.`);
-      }
-      return jsonResult(`Tarea ${id} eliminada.`, { id });
-    }),
+        if (result.length === 0) {
+          return errorResult(`No se encontró la tarea ${id}.`);
+        }
+        return jsonResult(`Tarea ${id} eliminada.`, { id });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -225,18 +237,21 @@ export function registerTaskTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async (_args: Record<string, never>, userId) => {
-      const rows = await db
-        .select({
-          id: projects.id,
-          name: projects.name,
-          githubRepo: projects.githubRepo,
-        })
-        .from(projects)
-        .where(eq(projects.userId, userId))
-        .orderBy(asc(projects.name));
+    withLogging(
+      "life_os_list_projects",
+      withUser(async (_args: Record<string, never>, userId) => {
+        const rows = await db
+          .select({
+            id: projects.id,
+            name: projects.name,
+            githubRepo: projects.githubRepo,
+          })
+          .from(projects)
+          .where(eq(projects.userId, userId))
+          .orderBy(asc(projects.name));
 
-      return jsonResult(`${rows.length} proyecto(s).`, { projects: rows });
-    }),
+        return jsonResult(`${rows.length} proyecto(s).`, { projects: rows });
+      }),
+    ),
   );
 }

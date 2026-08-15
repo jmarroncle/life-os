@@ -3,7 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { db } from "@/db";
 import { databaseColumns, databaseRows, databases } from "@/db/schema";
-import { errorResult, jsonResult, withUser } from "@/lib/mcp/tool-helpers";
+import { errorResult, jsonResult, withLogging, withUser } from "@/lib/mcp/tool-helpers";
 import { buildSimpleContent, extractPlainText } from "@/lib/mcp/block-content";
 import { rowLabel } from "@/lib/database-row-label";
 
@@ -82,15 +82,18 @@ export function registerDatabaseTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async (_args: Record<string, never>, userId) => {
-      const rows = await db
-        .select()
-        .from(databases)
-        .where(eq(databases.userId, userId))
-        .orderBy(asc(databases.name));
+    withLogging(
+      "life_os_list_databases",
+      withUser(async (_args: Record<string, never>, userId) => {
+        const rows = await db
+          .select()
+          .from(databases)
+          .where(eq(databases.userId, userId))
+          .orderBy(asc(databases.name));
 
-      return jsonResult(`${rows.length} base(s) de datos.`, { databases: rows });
-    }),
+        return jsonResult(`${rows.length} base(s) de datos.`, { databases: rows });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -109,39 +112,42 @@ export function registerDatabaseTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ id }: { id: string }, userId) => {
-      const [database] = await db
-        .select()
-        .from(databases)
-        .where(and(eq(databases.id, id), eq(databases.userId, userId)))
-        .limit(1);
-      if (!database) return errorResult(`No se encontró la base ${id}.`);
+    withLogging(
+      "life_os_get_database",
+      withUser(async ({ id }: { id: string }, userId) => {
+        const [database] = await db
+          .select()
+          .from(databases)
+          .where(and(eq(databases.id, id), eq(databases.userId, userId)))
+          .limit(1);
+        if (!database) return errorResult(`No se encontró la base ${id}.`);
 
-      const columns = await getColumns(id);
-      const rawRows = await db
-        .select()
-        .from(databaseRows)
-        .where(eq(databaseRows.databaseId, id))
-        .orderBy(asc(databaseRows.position), asc(databaseRows.createdAt));
+        const columns = await getColumns(id);
+        const rawRows = await db
+          .select()
+          .from(databaseRows)
+          .where(eq(databaseRows.databaseId, id))
+          .orderBy(asc(databaseRows.position), asc(databaseRows.createdAt));
 
-      const rows = rawRows.map((row) => {
-        const values = row.values as Record<string, unknown>;
-        const contentText = extractPlainText(row.content);
-        return {
-          id: row.id,
-          label: rowLabel(values, columns),
-          values: valuesByIdToByName(values, columns),
-          hasContent: contentText.length > 0,
-          contentPreview: contentText.slice(0, 200),
-        };
-      });
+        const rows = rawRows.map((row) => {
+          const values = row.values as Record<string, unknown>;
+          const contentText = extractPlainText(row.content);
+          return {
+            id: row.id,
+            label: rowLabel(values, columns),
+            values: valuesByIdToByName(values, columns),
+            hasContent: contentText.length > 0,
+            contentPreview: contentText.slice(0, 200),
+          };
+        });
 
-      return jsonResult(`Base "${database.name}": ${columns.length} columna(s), ${rows.length} fila(s).`, {
-        database: { id: database.id, name: database.name, icon: database.icon },
-        columns: columns.map((c) => ({ id: c.id, name: c.name, type: c.type, options: c.options })),
-        rows,
-      });
-    }),
+        return jsonResult(`Base "${database.name}": ${columns.length} columna(s), ${rows.length} fila(s).`, {
+          database: { id: database.id, name: database.name, icon: database.icon },
+          columns: columns.map((c) => ({ id: c.id, name: c.name, type: c.type, options: c.options })),
+          rows,
+        });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -160,25 +166,28 @@ export function registerDatabaseTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ rowId }: { rowId: string }, userId) => {
-      const [row] = await db
-        .select()
-        .from(databaseRows)
-        .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, userId)))
-        .limit(1);
-      if (!row) return errorResult(`No se encontró la fila ${rowId}.`);
+    withLogging(
+      "life_os_get_database_row",
+      withUser(async ({ rowId }: { rowId: string }, userId) => {
+        const [row] = await db
+          .select()
+          .from(databaseRows)
+          .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, userId)))
+          .limit(1);
+        if (!row) return errorResult(`No se encontró la fila ${rowId}.`);
 
-      const columns = await getColumns(row.databaseId);
-      const values = row.values as Record<string, unknown>;
+        const columns = await getColumns(row.databaseId);
+        const values = row.values as Record<string, unknown>;
 
-      return jsonResult(`Fila "${rowLabel(values, columns)}".`, {
-        id: row.id,
-        databaseId: row.databaseId,
-        label: rowLabel(values, columns),
-        values: valuesByIdToByName(values, columns),
-        content: extractPlainText(row.content),
-      });
-    }),
+        return jsonResult(`Fila "${rowLabel(values, columns)}".`, {
+          id: row.id,
+          databaseId: row.databaseId,
+          label: rowLabel(values, columns),
+          values: valuesByIdToByName(values, columns),
+          content: extractPlainText(row.content),
+        });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -207,41 +216,44 @@ export function registerDatabaseTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        {
-          databaseId,
-          values,
-          content,
-        }: { databaseId: string; values?: Record<string, unknown>; content?: string },
-        userId,
-      ) => {
-        const [database] = await db
-          .select()
-          .from(databases)
-          .where(and(eq(databases.id, databaseId), eq(databases.userId, userId)))
-          .limit(1);
-        if (!database) return errorResult(`No se encontró la base ${databaseId}.`);
-
-        const columns = await getColumns(databaseId);
-        const { values: byId, unknownNames } = valuesByNameToById(values ?? {}, columns);
-
-        const [created] = await db
-          .insert(databaseRows)
-          .values({
+    withLogging(
+      "life_os_add_database_row",
+      withUser(
+        async (
+          {
             databaseId,
-            userId,
-            values: byId,
-            content: content ? buildSimpleContent(content) : {},
-          })
-          .returning({ id: databaseRows.id });
+            values,
+            content,
+          }: { databaseId: string; values?: Record<string, unknown>; content?: string },
+          userId,
+        ) => {
+          const [database] = await db
+            .select()
+            .from(databases)
+            .where(and(eq(databases.id, databaseId), eq(databases.userId, userId)))
+            .limit(1);
+          if (!database) return errorResult(`No se encontró la base ${databaseId}.`);
 
-        const warning =
-          unknownNames.length > 0
-            ? ` Columnas ignoradas (no existen): ${unknownNames.join(", ")}.`
-            : "";
-        return jsonResult(`Fila creada en "${database.name}".${warning}`, { id: created.id });
-      },
+          const columns = await getColumns(databaseId);
+          const { values: byId, unknownNames } = valuesByNameToById(values ?? {}, columns);
+
+          const [created] = await db
+            .insert(databaseRows)
+            .values({
+              databaseId,
+              userId,
+              values: byId,
+              content: content ? buildSimpleContent(content) : {},
+            })
+            .returning({ id: databaseRows.id });
+
+          const warning =
+            unknownNames.length > 0
+              ? ` Columnas ignoradas (no existen): ${unknownNames.join(", ")}.`
+              : "";
+          return jsonResult(`Fila creada en "${database.name}".${warning}`, { id: created.id });
+        },
+      ),
     ),
   );
 
@@ -269,43 +281,46 @@ export function registerDatabaseTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        {
-          rowId,
-          values,
-          content,
-        }: { rowId: string; values?: Record<string, unknown>; content?: string },
-        userId,
-      ) => {
-        const [row] = await db
-          .select()
-          .from(databaseRows)
-          .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, userId)))
-          .limit(1);
-        if (!row) return errorResult(`No se encontró la fila ${rowId}.`);
+    withLogging(
+      "life_os_update_database_row",
+      withUser(
+        async (
+          {
+            rowId,
+            values,
+            content,
+          }: { rowId: string; values?: Record<string, unknown>; content?: string },
+          userId,
+        ) => {
+          const [row] = await db
+            .select()
+            .from(databaseRows)
+            .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, userId)))
+            .limit(1);
+          if (!row) return errorResult(`No se encontró la fila ${rowId}.`);
 
-        const columns = await getColumns(row.databaseId);
-        const updates: Record<string, unknown> = { updatedAt: new Date() };
-        let unknownNames: string[] = [];
+          const columns = await getColumns(row.databaseId);
+          const updates: Record<string, unknown> = { updatedAt: new Date() };
+          let unknownNames: string[] = [];
 
-        if (values) {
-          const merged = valuesByNameToById(values, columns);
-          unknownNames = merged.unknownNames;
-          updates.values = { ...(row.values as Record<string, unknown>), ...merged.values };
-        }
-        if (content !== undefined) {
-          updates.content = buildSimpleContent(content);
-        }
+          if (values) {
+            const merged = valuesByNameToById(values, columns);
+            unknownNames = merged.unknownNames;
+            updates.values = { ...(row.values as Record<string, unknown>), ...merged.values };
+          }
+          if (content !== undefined) {
+            updates.content = buildSimpleContent(content);
+          }
 
-        await db.update(databaseRows).set(updates).where(eq(databaseRows.id, rowId));
+          await db.update(databaseRows).set(updates).where(eq(databaseRows.id, rowId));
 
-        const warning =
-          unknownNames.length > 0
-            ? ` Columnas ignoradas (no existen): ${unknownNames.join(", ")}.`
-            : "";
-        return jsonResult(`Fila ${rowId} actualizada.${warning}`, { id: rowId });
-      },
+          const warning =
+            unknownNames.length > 0
+              ? ` Columnas ignoradas (no existen): ${unknownNames.join(", ")}.`
+              : "";
+          return jsonResult(`Fila ${rowId} actualizada.${warning}`, { id: rowId });
+        },
+      ),
     ),
   );
 
@@ -332,46 +347,49 @@ export function registerDatabaseTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(
-      async (
-        {
-          databaseId,
-          name,
-          type,
-          options,
-        }: {
-          databaseId: string;
-          name: string;
-          type: string;
-          options?: string[];
-        },
-        userId,
-      ) => {
-        const [database] = await db
-          .select()
-          .from(databases)
-          .where(and(eq(databases.id, databaseId), eq(databases.userId, userId)))
-          .limit(1);
-        if (!database) return errorResult(`No se encontró la base ${databaseId}.`);
-
-        const existing = await getColumns(databaseId);
-        const [created] = await db
-          .insert(databaseColumns)
-          .values({
+    withLogging(
+      "life_os_add_database_column",
+      withUser(
+        async (
+          {
             databaseId,
-            userId,
             name,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            type: type as any,
-            options: type === "select" || type === "multi_select" ? (options ?? null) : null,
-            position: existing.length,
-          })
-          .returning({ id: databaseColumns.id });
+            type,
+            options,
+          }: {
+            databaseId: string;
+            name: string;
+            type: string;
+            options?: string[];
+          },
+          userId,
+        ) => {
+          const [database] = await db
+            .select()
+            .from(databases)
+            .where(and(eq(databases.id, databaseId), eq(databases.userId, userId)))
+            .limit(1);
+          if (!database) return errorResult(`No se encontró la base ${databaseId}.`);
 
-        return jsonResult(`Columna "${name}" agregada a "${database.name}".`, {
-          id: created.id,
-        });
-      },
+          const existing = await getColumns(databaseId);
+          const [created] = await db
+            .insert(databaseColumns)
+            .values({
+              databaseId,
+              userId,
+              name,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              type: type as any,
+              options: type === "select" || type === "multi_select" ? (options ?? null) : null,
+              position: existing.length,
+            })
+            .returning({ id: databaseColumns.id });
+
+          return jsonResult(`Columna "${name}" agregada a "${database.name}".`, {
+            id: created.id,
+          });
+        },
+      ),
     ),
   );
 
@@ -388,16 +406,19 @@ export function registerDatabaseTools(server: McpServer) {
         openWorldHint: false,
       },
     },
-    withUser(async ({ rowId }: { rowId: string }, userId) => {
-      const result = await db
-        .delete(databaseRows)
-        .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, userId)))
-        .returning({ id: databaseRows.id });
+    withLogging(
+      "life_os_delete_database_row",
+      withUser(async ({ rowId }: { rowId: string }, userId) => {
+        const result = await db
+          .delete(databaseRows)
+          .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, userId)))
+          .returning({ id: databaseRows.id });
 
-      if (result.length === 0) {
-        return errorResult(`No se encontró la fila ${rowId}.`);
-      }
-      return jsonResult(`Fila ${rowId} eliminada.`, { id: rowId });
-    }),
+        if (result.length === 0) {
+          return errorResult(`No se encontró la fila ${rowId}.`);
+        }
+        return jsonResult(`Fila ${rowId} eliminada.`, { id: rowId });
+      }),
+    ),
   );
 }

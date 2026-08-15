@@ -1,5 +1,6 @@
 import {
   type AnyPgColumn,
+  boolean,
   index,
   integer,
   jsonb,
@@ -358,6 +359,40 @@ export const undoLog = lifeOs.table(
       .defaultNow(),
   },
   (table) => [index("undo_log_user_id_idx").on(table.userId)],
+);
+
+// --- MCP: log de llamadas ---
+// Una fila por cada tool MCP invocado (ver src/lib/mcp/tool-helpers.ts,
+// withLogging). El objetivo es poder auditar el uso del conector — qué se
+// llamó, cuándo, si falló, cuánto tardó — y tener una idea del volumen de
+// tokens, no un costo exacto: estimatedTokensIn/Out se calculan con una
+// heurística de ~4 caracteres por token sobre los args y la respuesta
+// (ver estimateTokens en log-call.ts), no con el tokenizer real de Claude
+// (no es público). No se guarda el payload completo de cada llamada —
+// solo un resumen corto — para no duplicar datos que ya viven en sus
+// propias tablas ni inflar esta.
+
+export const mcpCalls = lifeOs.table(
+  "mcp_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    toolName: text("tool_name").notNull(),
+    success: boolean("success").notNull(),
+    summary: text("summary"),
+    durationMs: integer("duration_ms").notNull(),
+    estimatedTokensIn: integer("estimated_tokens_in").notNull(),
+    estimatedTokensOut: integer("estimated_tokens_out").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("mcp_calls_user_id_idx").on(table.userId),
+    index("mcp_calls_created_at_idx").on(table.createdAt),
+  ],
 );
 
 // --- Google Calendar ---
