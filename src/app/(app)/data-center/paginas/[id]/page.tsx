@@ -10,6 +10,7 @@ import {
 } from "../../actions";
 import { EntityEditor } from "@/components/entity-editor";
 import { PageIconPicker } from "@/components/page-icon-picker";
+import { PageLayoutPicker } from "@/components/page-layout-picker";
 import {
   emptyBlockValue,
   type YooptaContentValue,
@@ -52,6 +53,11 @@ export default async function PaginaPage({
     await updatePage(id, { icon });
   }
 
+  async function saveLayout(layout: "normal" | "columns-2" | "columns-3") {
+    "use server";
+    await updatePage(id, { layout });
+  }
+
   async function convertToPage(text: string) {
     "use server";
     const newId = await createPageFromBlock(id, text);
@@ -92,7 +98,10 @@ export default async function PaginaPage({
         </form>
       </div>
 
-      <PageIconPicker initialIcon={page.icon} onIconChange={saveIcon} />
+      <div className="flex items-center justify-between">
+        <PageIconPicker initialIcon={page.icon} onIconChange={saveIcon} />
+        <PageLayoutPicker initialLayout={page.layout} onLayoutChange={saveLayout} />
+      </div>
 
       <EntityEditor
         initialTitle={page.title}
@@ -100,6 +109,7 @@ export default async function PaginaPage({
         onSaveTitle={saveTitle}
         onSaveContent={saveContent}
         onConvertToPage={convertToPage}
+        layout={page.layout}
       />
 
       <div className="space-y-2 border-t border-neutral-100 pt-4">

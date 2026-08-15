@@ -12,6 +12,7 @@ export function EntityEditor({
   onSaveContent,
   extraHeader,
   onConvertToPage,
+  layout = "normal",
 }: {
   initialTitle: string;
   initialContent: YooptaContentValue;
@@ -19,6 +20,7 @@ export function EntityEditor({
   onSaveContent: (content: YooptaContentValue) => Promise<void>;
   extraHeader?: ReactNode;
   onConvertToPage?: (text: string) => Promise<{ url: string; label: string }>;
+  layout?: "normal" | "columns-2" | "columns-3";
 }) {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,6 +58,7 @@ export function EntityEditor({
         initialValue={initialContent}
         onChange={scheduleContentSave}
         onConvertToPage={onConvertToPage}
+        layout={layout}
       />
     </div>
   );

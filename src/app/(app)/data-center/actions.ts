@@ -3,9 +3,11 @@
 import { and, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { pages } from "@/db/schema";
+import { pageLayout, pages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import type { YooptaContentValue } from "@/components/block-editor";
+
+export type PageLayout = (typeof pageLayout.enumValues)[number];
 
 export async function listPages() {
   const user = await requireUser();
@@ -61,7 +63,12 @@ export async function createPageFromBlock(parentId: string, title: string) {
 
 export async function updatePage(
   id: string,
-  data: { title?: string; content?: YooptaContentValue; icon?: string | null },
+  data: {
+    title?: string;
+    content?: YooptaContentValue;
+    icon?: string | null;
+    layout?: PageLayout;
+  },
 ) {
   const user = await requireUser();
   await db

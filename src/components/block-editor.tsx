@@ -23,12 +23,15 @@ export function BlockEditor({
   placeholder = "Escribí algo, o \"# \" para un título, \"- \" para una lista…",
   readOnly = false,
   onConvertToPage,
+  layout = "normal",
 }: {
   initialValue: YooptaContentValue;
   onChange?: (value: YooptaContentValue) => void;
   placeholder?: string;
   readOnly?: boolean;
   onConvertToPage?: (text: string) => Promise<{ url: string; label: string }>;
+  // "columns-N": reparte el contenido en columnas CSS, ver globals.css.
+  layout?: "normal" | "columns-2" | "columns-3";
 }) {
   const editor = useMemo(
     () => createYooptaEditor({ plugins, marks, value: initialValue, readOnly }),
@@ -41,7 +44,11 @@ export function BlockEditor({
       editor={editor}
       onChange={(value) => onChange?.(value)}
       placeholder={placeholder}
-      className="yoopta-editor-life-os"
+      className={
+        layout === "normal"
+          ? "yoopta-editor-life-os"
+          : `yoopta-editor-life-os yoopta-editor-${layout}`
+      }
       renderBlock={
         readOnly
           ? undefined

@@ -50,6 +50,13 @@
       "when": 1786722956370,
       "tag": "0006_bizarre_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786753786934,
+      "tag": "0007_damp_greymalkin",
+      "breakpoints": true
     }
   ]
 }

@@ -75,6 +75,12 @@ export const tasks = lifeOs.table(
   ],
 );
 
+export const pageLayout = lifeOs.enum("page_layout", [
+  "normal",
+  "columns-2",
+  "columns-3",
+]);
+
 export const pages = lifeOs.table(
   "pages",
   {
@@ -94,6 +100,13 @@ export const pages = lifeOs.table(
     // para subir imágenes como ícono, solo emoji, igual que la Libreta no
     // tiene tags con color: mantener la personalización simple.
     icon: text("icon"),
+    // "columns-N": el contenido se reparte en N columnas CSS, cortando
+    // antes de cada HeadingOne/Two/Three (ver globals.css). No es un
+    // bloque de columnas editable tipo Notion (elegís vos qué bloque va en
+    // qué columna) — es automático según los encabezados que ya tenga la
+    // página. Alcanza para el caso de una página "índice" con varias
+    // secciones (como el Home migrado de Notion).
+    layout: pageLayout("layout").notNull().default("normal"),
     content: jsonb("content").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

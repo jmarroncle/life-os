@@ -109,3 +109,37 @@ body {
 .yoopta-editor-life-os [data-element-type="link"]:hover {
   color: var(--color-blue-300);
 }
+
+/*
+ * Layout de columnas por página (ver pages.layout en el schema). No es un
+ * bloque de columnas editable tipo Notion: es un reflow automático vía CSS
+ * multi-column sobre el contenido ya existente, cortando una columna nueva
+ * antes de cada encabezado (para que cada sección quede agrupada) y evitando
+ * partir un bloque individual al medio de una columna.
+ */
+.yoopta-editor-columns-2 {
+  column-count: 2;
+  column-gap: 2.5rem;
+}
+.yoopta-editor-columns-3 {
+  column-count: 3;
+  column-gap: 2rem;
+}
+.yoopta-editor-columns-2 [data-yoopta-block],
+.yoopta-editor-columns-3 [data-yoopta-block] {
+  break-inside: avoid;
+}
+.yoopta-editor-columns-2 [data-element-type="heading-one"],
+.yoopta-editor-columns-3 [data-element-type="heading-one"] {
+  break-before: column;
+}
+.yoopta-editor-columns-2 [data-yoopta-block]:first-child [data-element-type="heading-one"],
+.yoopta-editor-columns-3 [data-yoopta-block]:first-child [data-element-type="heading-one"] {
+  break-before: avoid;
+}
+@media (max-width: 768px) {
+  .yoopta-editor-columns-2,
+  .yoopta-editor-columns-3 {
+    column-count: 1;
+  }
+}

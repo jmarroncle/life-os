@@ -1,0 +1,2 @@
+CREATE TYPE "life_os"."page_layout" AS ENUM('normal', 'columns-2', 'columns-3');--> statement-breakpoint
+ALTER TABLE "life_os"."pages" ADD COLUMN "layout" "life_os"."page_layout" DEFAULT 'normal' NOT NULL;
