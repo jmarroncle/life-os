@@ -8,6 +8,7 @@ import { DashboardWidgets } from "@/components/dashboard-widgets";
 import { listTasks } from "./data-center/tareas/actions";
 import { getMonthSummary } from "./finanzas/actions";
 import { listPages } from "./data-center/actions";
+import { listDraftItems } from "./data-center/revisar/actions";
 import { listNotes } from "./libreta/actions";
 
 async function getUpcomingEventsPreview() {
@@ -32,12 +33,13 @@ async function getUpcomingEventsPreview() {
 export default async function HomePage() {
   const month = currentMonth();
 
-  const [tasks, summary, pages, notes, calendar] = await Promise.all([
+  const [tasks, summary, pages, notes, calendar, draftItems] = await Promise.all([
     listTasks(),
     getMonthSummary(month),
     listPages(),
     listNotes(),
     getUpcomingEventsPreview(),
+    listDraftItems(),
   ]);
 
   const pendingTasks = tasks.filter((task) => task.status !== "done");
@@ -70,6 +72,7 @@ export default async function HomePage() {
         calendar={calendar}
         recentPages={recentPages}
         recentNotes={recentNotes}
+        draftItems={draftItems}
       />
     </div>
   );

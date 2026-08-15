@@ -244,6 +244,9 @@ export function registerDatabaseTools(server: McpServer) {
               userId,
               values: byId,
               content: content ? buildSimpleContent(content) : {},
+              // Todo lo creado vía MCP entra como borrador sin revisar — ver
+              // Decisiones en CLAUDE.md, cola "Por revisar".
+              reviewStatus: "draft",
             })
             .returning({ id: databaseRows.id });
 
@@ -310,6 +313,9 @@ export function registerDatabaseTools(server: McpServer) {
           }
           if (content !== undefined) {
             updates.content = buildSimpleContent(content);
+            // Un edit de contenido por MCP vuelve a mandar la fila a
+            // revisar, aunque ya hubiera sido aprobada antes.
+            updates.reviewStatus = "draft";
           }
 
           await db.update(databaseRows).set(updates).where(eq(databaseRows.id, rowId));

@@ -125,6 +125,9 @@ export function registerPageTools(server: McpServer) {
               parentId: parentId ?? null,
               icon: icon ?? null,
               content: buildSimpleContent(content ?? ""),
+              // Todo lo creado vía MCP entra como borrador sin revisar — ver
+              // Decisiones en CLAUDE.md, cola "Por revisar".
+              reviewStatus: "draft",
             })
             .returning({ id: pages.id });
 
@@ -164,7 +167,12 @@ export function registerPageTools(server: McpServer) {
         ) => {
           const updates: Record<string, unknown> = { updatedAt: new Date() };
           if (title !== undefined) updates.title = title;
-          if (content !== undefined) updates.content = buildSimpleContent(content);
+          if (content !== undefined) {
+            updates.content = buildSimpleContent(content);
+            // Un edit de contenido por MCP vuelve a mandar la página a
+            // revisar, aunque ya hubiera sido aprobada antes.
+            updates.reviewStatus = "draft";
+          }
 
           const result = await db
             .update(pages)

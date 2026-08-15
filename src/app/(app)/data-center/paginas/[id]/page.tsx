@@ -5,9 +5,13 @@ import {
   createPageFromBlock,
   deletePage,
   getPage,
+  linkDatabaseToPage,
+  listLinkedDatabases,
   listPages,
+  unlinkDatabaseFromPage,
   updatePage,
 } from "../../actions";
+import { listDatabases } from "../../../bases/actions";
 import { EntityEditor } from "@/components/entity-editor";
 import { PageIconPicker } from "@/components/page-icon-picker";
 import { PageLayoutPicker } from "@/components/page-layout-picker";
@@ -20,11 +24,21 @@ export default async function PaginaPage({
   params,
 }: PageProps<"/data-center/paginas/[id]">) {
   const { id } = await params;
-  const [page, allPages] = await Promise.all([getPage(id), listPages()]);
+  const [page, allPages, linkedDatabases, allDatabases] = await Promise.all([
+    getPage(id),
+    listPages(),
+    listLinkedDatabases(id),
+    listDatabases(),
+  ]);
 
   if (!page) {
     notFound();
   }
+
+  const linkedDatabaseIds = new Set(linkedDatabases.map((link) => link.databaseId));
+  const availableDatabases = allDatabases.filter(
+    (database) => !linkedDatabaseIds.has(database.id),
+  );
 
   const byId = new Map(allPages.map((item) => [item.id, item]));
   const ancestors: { id: string; title: string; icon: string | null }[] = [];
@@ -111,6 +125,67 @@ export default async function PaginaPage({
         onConvertToPage={convertToPage}
         layout={page.layout}
       />
+
+      <div className="space-y-2 border-t border-neutral-100 pt-4">
+        <p className="text-xs font-medium text-neutral-500">Bases de datos</p>
+        {linkedDatabases.length > 0 && (
+          <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200">
+            {linkedDatabases.map((link) => (
+              <li
+                key={link.linkId}
+                className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-neutral-50"
+              >
+                <Link href={`/bases/${link.databaseId}`} className="flex-1">
+                  {link.icon ?? "📋"} {link.name}
+                </Link>
+                <form action={unlinkDatabaseFromPage.bind(null, link.linkId)}>
+                  <button
+                    type="submit"
+                    className="shrink-0 text-xs text-neutral-400 hover:text-red-600"
+                  >
+                    Quitar
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+        {availableDatabases.length > 0 ? (
+          <form action={linkDatabaseToPage.bind(null, id)} className="flex gap-2">
+            <select
+              name="databaseId"
+              required
+              defaultValue=""
+              className="flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500"
+            >
+              <option value="" disabled>
+                Elegí una base de datos…
+              </option>
+              {availableDatabases.map((database) => (
+                <option key={database.id} value={database.id}>
+                  {database.icon ?? "📋"} {database.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            >
+              Vincular base de datos
+            </button>
+          </form>
+        ) : (
+          linkedDatabases.length === 0 && (
+            <p className="text-xs text-neutral-400">
+              No hay bases de datos para vincular todavía —{" "}
+              <Link href="/bases" className="underline hover:text-neutral-600">
+                creá una en Bases de datos
+              </Link>
+              .
+            </p>
+          )
+        )}
+      </div>
 
       <div className="space-y-2 border-t border-neutral-100 pt-4">
         <p className="text-xs font-medium text-neutral-500">Subpáginas</p>
