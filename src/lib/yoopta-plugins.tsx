@@ -10,6 +10,7 @@ import Table from "@yoopta/table";
 import { Bold, Italic, Underline, Strike, CodeMark } from "@yoopta/marks";
 import { YooptaPlugin, type SlateElement } from "@yoopta/editor";
 import { uploadBlockImage } from "@/lib/uploads";
+import { BlockEditorImage } from "@/components/block-editor-image";
 
 // El plugin llama upload(file, onProgress) del lado del cliente; onProgress
 // es una función y no se puede pasar como argumento a una server action
@@ -46,7 +47,15 @@ export const plugins: YooptaPlugin<Record<string, SlateElement>>[] = [
   Code,
   Link,
   Divider,
-  Image.extend({ options: { upload: handleImageUpload } }),
+  // @yoopta/image no trae ninguna UI propia — su render por default es
+  // solo <img src={…} />, sin botón ni dropzone para elegir un archivo
+  // (confirmado leyendo su fuente). BlockEditorImage la reemplaza con un
+  // estado "todavía no hay imagen" (botón + <input type="file">) y sigue
+  // usando la misma uploadBlockImage.
+  Image.extend({
+    options: { upload: handleImageUpload },
+    elements: { image: { render: (props) => <BlockEditorImage {...props} /> } },
+  }),
   // Table tiene 3 claves de elemento (table/table-row/table-data-cell) que
   // se referencian entre sí en su tipo `children`; TS no logra angostar eso
   // al tipo genérico `Record<string, SlateElement>` que espera este array
