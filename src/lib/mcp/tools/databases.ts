@@ -67,6 +67,53 @@ function valuesByNameToById(
   return { values: out, unknownNames };
 }
 
+const AI_TAG_COLUMN_NAME = "Tags";
+const AI_TAG_VALUE = "IA";
+
+// Toda fila creada vía MCP lleva el tag "IA" en su columna "Tags" (multi_select)
+// — ver Decisiones en CLAUDE.md, misma convención que review_status y el tag
+// "IA" de life_os_create_note. Si la base todavía no tiene una columna
+// "Tags", se crea (con "IA" ya como opción disponible) en vez de fallar o
+// depender de que el usuario la haya armado a mano de antemano.
+async function ensureAiTag(
+  databaseId: string,
+  userId: string,
+  columns: ColumnRef[],
+  byIdValues: Record<string, unknown>,
+): Promise<void> {
+  let tagColumn = columns.find(
+    (c) => c.type === "multi_select" && c.name.toLowerCase() === AI_TAG_COLUMN_NAME.toLowerCase(),
+  );
+
+  if (!tagColumn) {
+    const [created] = await db
+      .insert(databaseColumns)
+      .values({
+        databaseId,
+        userId,
+        name: AI_TAG_COLUMN_NAME,
+        type: "multi_select",
+        options: [AI_TAG_VALUE],
+        position: columns.length,
+      })
+      .returning();
+    tagColumn = created;
+  } else if (!(tagColumn.options ?? []).includes(AI_TAG_VALUE)) {
+    const nextOptions = [...(tagColumn.options ?? []), AI_TAG_VALUE];
+    await db
+      .update(databaseColumns)
+      .set({ options: nextOptions })
+      .where(eq(databaseColumns.id, tagColumn.id));
+  }
+
+  const existing = Array.isArray(byIdValues[tagColumn.id])
+    ? (byIdValues[tagColumn.id] as string[])
+    : [];
+  if (!existing.includes(AI_TAG_VALUE)) {
+    byIdValues[tagColumn.id] = [...existing, AI_TAG_VALUE];
+  }
+}
+
 export function registerDatabaseTools(server: McpServer) {
   server.registerTool(
     "life_os_list_databases",
@@ -236,6 +283,7 @@ export function registerDatabaseTools(server: McpServer) {
 
           const columns = await getColumns(databaseId);
           const { values: byId, unknownNames } = valuesByNameToById(values ?? {}, columns);
+          await ensureAiTag(databaseId, userId, columns, byId);
 
           const [created] = await db
             .insert(databaseRows)

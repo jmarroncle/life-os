@@ -113,13 +113,17 @@ export function registerNoteTools(server: McpServer) {
           { title, content, tags }: { title: string; content?: string; tags?: string[] },
           userId,
         ) => {
+          // Toda nota creada vía MCP lleva el tag "IA" — ver Decisiones en
+          // CLAUDE.md, misma convención que review_status en pages/rows.
+          const tagSet = new Set([...(tags ?? []), "IA"]);
+
           const [created] = await db
             .insert(notes)
             .values({
               userId,
               title,
               content: buildSimpleContent(content ?? ""),
-              tags: tags ?? [],
+              tags: [...tagSet],
             })
             .returning({ id: notes.id });
 
