@@ -32,7 +32,7 @@ flowchart TB
         foco["⏱️ Foco<br/><sub>Pomodoro</sub>"]
     end
 
-    mcpserver["🔌 /api/mcp<br/><sub>19 tools · Streamable HTTP</sub>"]
+    mcpserver["🔌 /api/mcp<br/><sub>26 tools · Streamable HTTP</sub>"]
 
     browser --> modulos
     chat --> mcpserver --> modulos
