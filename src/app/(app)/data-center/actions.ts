@@ -1,9 +1,9 @@
 "use server";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { pageLayout, pages } from "@/db/schema";
+import { databases, pageDatabaseLinks, pageLayout, pages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { logUndo, omitId, type InverseOp } from "@/lib/undo";
 import type { YooptaContentValue } from "@/components/block-editor";
@@ -191,6 +191,63 @@ export async function deletePage(id: string) {
       ? `/data-center/paginas/${deleted.parentId}`
       : "/data-center",
   );
+}
+
+// Bases de datos "embebidas" en una página (ver Decisiones en CLAUDE.md).
+// Distinto de listPages/getPage: acá se lee/escribe la tabla puente
+// pageDatabaseLinks, no pages.
+
+export async function listLinkedDatabases(pageId: string) {
+  const user = await requireUser();
+  return db
+    .select({
+      linkId: pageDatabaseLinks.id,
+      databaseId: databases.id,
+      name: databases.name,
+      icon: databases.icon,
+    })
+    .from(pageDatabaseLinks)
+    .innerJoin(databases, eq(pageDatabaseLinks.databaseId, databases.id))
+    .where(
+      and(eq(pageDatabaseLinks.pageId, pageId), eq(pageDatabaseLinks.userId, user.id)),
+    )
+    .orderBy(asc(databases.name));
+}
+
+export async function linkDatabaseToPage(pageId: string, formData: FormData) {
+  const user = await requireUser();
+  const databaseId = String(formData.get("databaseId") ?? "").trim();
+  if (!databaseId) return;
+
+  const [created] = await db
+    .insert(pageDatabaseLinks)
+    .values({ userId: user.id, pageId, databaseId })
+    .onConflictDoNothing()
+    .returning({ id: pageDatabaseLinks.id });
+
+  if (created) {
+    await logUndo(user.id, "Vincular base de datos a la página", [
+      { op: "delete", table: "pageDatabaseLinks", id: created.id },
+    ]);
+  }
+}
+
+export async function unlinkDatabaseFromPage(linkId: string) {
+  const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(pageDatabaseLinks)
+    .where(and(eq(pageDatabaseLinks.id, linkId), eq(pageDatabaseLinks.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
+  await db
+    .delete(pageDatabaseLinks)
+    .where(and(eq(pageDatabaseLinks.id, linkId), eq(pageDatabaseLinks.userId, user.id)));
+
+  await logUndo(user.id, "Desvincular base de datos de la página", [
+    { op: "insert", table: "pageDatabaseLinks", values: before },
+  ]);
 }
 
 export async function createPageWithContent(

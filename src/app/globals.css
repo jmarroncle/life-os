@@ -55,6 +55,7 @@
   --color-green-700: oklch(79.2% 0.209 151.711);
   --color-red-500: oklch(70.4% 0.191 22.216);
   --color-red-600: oklch(70.4% 0.191 22.216);
+  --color-amber-500: oklch(82.8% 0.189 84.429);
 }
 
 body {

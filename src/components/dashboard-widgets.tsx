@@ -3,12 +3,21 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { formatCents } from "@/lib/money";
+import type { DraftItem } from "@/app/(app)/data-center/revisar/actions";
 
 const STORAGE_KEY = "life-os:dashboard-widgets";
 
-type WidgetKey = "tareas" | "finanzas" | "calendario" | "foco" | "paginas" | "notas";
+type WidgetKey =
+  | "revisar"
+  | "tareas"
+  | "finanzas"
+  | "calendario"
+  | "foco"
+  | "paginas"
+  | "notas";
 
 const WIDGET_LABELS: Record<WidgetKey, string> = {
+  revisar: "Por revisar",
   tareas: "Tareas pendientes",
   finanzas: "Finanzas del mes",
   calendario: "Próximos eventos",
@@ -18,6 +27,7 @@ const WIDGET_LABELS: Record<WidgetKey, string> = {
 };
 
 const DEFAULT_ORDER: WidgetKey[] = [
+  "revisar",
   "tareas",
   "finanzas",
   "calendario",
@@ -38,6 +48,7 @@ export function DashboardWidgets({
   calendar,
   recentPages,
   recentNotes,
+  draftItems,
 }: {
   pendingTasks: Task[];
   month: string;
@@ -45,6 +56,7 @@ export function DashboardWidgets({
   calendar: { connected: boolean; events: CalendarEvent[] };
   recentPages: Page[];
   recentNotes: Note[];
+  draftItems: DraftItem[];
 }) {
   const [order, setOrder] = useState<WidgetKey[]>(DEFAULT_ORDER);
   const [hidden, setHidden] = useState<Set<WidgetKey>>(new Set());
@@ -93,6 +105,48 @@ export function DashboardWidgets({
   }
 
   const widgetContent: Record<WidgetKey, ReactNode> = {
+    revisar:
+      draftItems.length === 0 ? (
+        <Widget title="Por revisar" href="/data-center/revisar">
+          <p className="mt-3 text-sm text-neutral-400">
+            Nada esperando revisión.
+          </p>
+        </Widget>
+      ) : (
+        <div className="rounded-md border border-amber-500 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-medium text-neutral-500">
+              Por revisar
+              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                {draftItems.length}
+              </span>
+            </h2>
+            <Link
+              href="/data-center/revisar"
+              className="text-xs text-neutral-400 hover:text-neutral-900"
+            >
+              Ver todo →
+            </Link>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {draftItems.slice(0, 5).map((item) => (
+              <li key={`${item.type}-${item.id}`}>
+                <Link
+                  href={item.href}
+                  className="flex items-center justify-between gap-2 rounded px-1 py-1 text-sm hover:bg-neutral-50"
+                >
+                  <span className="truncate">
+                    {item.icon ?? (item.type === "page" ? "📄" : "📋")} {item.title}
+                  </span>
+                  <span className="shrink-0 text-xs text-neutral-400">
+                    {item.contextLabel}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ),
     tareas: (
       <Widget title="Tareas pendientes" href="/data-center/tareas">
         {pendingTasks.length === 0 ? (

@@ -82,6 +82,15 @@ export const pageLayout = lifeOs.enum("page_layout", [
   "columns-3",
 ]);
 
+// "draft" = generado/editado por IA (vía MCP) y todavía sin revisar por el
+// usuario. "reviewed" es el default para todo lo creado a mano en la app —
+// no necesita pasar por la cola de revisión. Se usa tanto en pages como en
+// database_rows (ver más abajo), mismo enum para las dos.
+export const contentReviewStatus = lifeOs.enum("content_review_status", [
+  "draft",
+  "reviewed",
+]);
+
 export const pages = lifeOs.table(
   "pages",
   {
@@ -109,6 +118,9 @@ export const pages = lifeOs.table(
     // secciones (como el Home migrado de Notion).
     layout: pageLayout("layout").notNull().default("normal"),
     content: jsonb("content").notNull().default({}),
+    // "draft" cuando la crea/edita el MCP (ver src/lib/mcp/tools/pages.ts) —
+    // ver Decisiones en CLAUDE.md, cola "Por revisar".
+    reviewStatus: contentReviewStatus("review_status").notNull().default("reviewed"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -119,6 +131,7 @@ export const pages = lifeOs.table(
   (table) => [
     index("pages_user_id_idx").on(table.userId),
     index("pages_parent_id_idx").on(table.parentId),
+    index("pages_review_status_idx").on(table.reviewStatus),
   ],
 );
 
@@ -324,6 +337,8 @@ export const databaseRows = lifeOs.table(
     // base de datos es también una página completa (texto, tablas,
     // imágenes) — esto es lo mismo acá, aparte de sus valores de columna.
     content: jsonb("content").notNull().default({}),
+    // Mismo campo y mismo criterio que pages.reviewStatus — ver ahí.
+    reviewStatus: contentReviewStatus("review_status").notNull().default("reviewed"),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -332,7 +347,44 @@ export const databaseRows = lifeOs.table(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("database_rows_database_id_idx").on(table.databaseId)],
+  (table) => [
+    index("database_rows_database_id_idx").on(table.databaseId),
+    index("database_rows_review_status_idx").on(table.reviewStatus),
+  ],
+);
+
+// --- Vínculo página <-> base de datos ---
+// Una página puede "embeber" bases de datos existentes (ej. la página
+// "Marketing y ventas" mostrando la base "Suite de productos" como una
+// tarjeta clickeable) sin duplicar datos: esta tabla solo guarda qué
+// databases se muestran en qué página. Único (pageId, databaseId) para no
+// repetir el mismo embed dos veces en la misma página.
+
+export const pageDatabaseLinks = lifeOs.table(
+  "page_database_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    databaseId: uuid("database_id")
+      .notNull()
+      .references(() => databases.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("page_database_links_page_id_idx").on(table.pageId),
+    index("page_database_links_database_id_idx").on(table.databaseId),
+    uniqueIndex("page_database_links_page_database_idx").on(
+      table.pageId,
+      table.databaseId,
+    ),
+  ],
 );
 
 // --- Deshacer ---

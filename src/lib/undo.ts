@@ -8,6 +8,7 @@ import {
   databaseRows,
   databases,
   notes,
+  pageDatabaseLinks,
   pages,
   projects,
   tasks,
@@ -31,6 +32,7 @@ const TABLES = {
   databases,
   databaseColumns,
   databaseRows,
+  pageDatabaseLinks,
 } as const;
 
 export type UndoTableName = keyof typeof TABLES;
