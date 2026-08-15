@@ -12,13 +12,13 @@ export default async function LibretaPage({
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Libreta</h1>
 
-      <form action="/libreta" className="flex gap-2">
+      <form action="/libreta" className="flex flex-wrap gap-2">
         <input
           type="text"
           name="q"
           defaultValue={query}
           placeholder="Buscar por título o tag…"
-          className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+          className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
         />
         <button
           type="submit"
@@ -28,18 +28,18 @@ export default async function LibretaPage({
         </button>
       </form>
 
-      <form action={createNote} className="flex gap-2">
+      <form action={createNote} className="flex flex-wrap gap-2">
         <input
           type="text"
           name="title"
           placeholder="Título de la nueva nota…"
-          className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+          className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
         />
         <input
           type="text"
           name="tags"
           placeholder="tags (opcional, separados por coma)"
-          className="w-56 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+          className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 sm:w-56 sm:flex-none"
         />
         <button
           type="submit"

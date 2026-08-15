@@ -151,12 +151,12 @@ export default async function PaginaPage({
           </ul>
         )}
         {availableDatabases.length > 0 ? (
-          <form action={linkDatabaseToPage.bind(null, id)} className="flex gap-2">
+          <form action={linkDatabaseToPage.bind(null, id)} className="flex flex-wrap gap-2">
             <select
               name="databaseId"
               required
               defaultValue=""
-              className="flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500"
             >
               <option value="" disabled>
                 Elegí una base de datos…
@@ -208,12 +208,12 @@ export default async function PaginaPage({
             ))}
           </ul>
         )}
-        <form action={createPage.bind(null, id)} className="flex gap-2">
+        <form action={createPage.bind(null, id)} className="flex flex-wrap gap-2">
           <input
             type="text"
             name="title"
             placeholder="Título de la subpágina…"
-            className="flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500"
+            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500"
           />
           <button
             type="submit"
