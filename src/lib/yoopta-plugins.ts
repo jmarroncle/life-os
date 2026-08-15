@@ -8,7 +8,7 @@ import Divider from "@yoopta/divider";
 import Image, { type ImageUploadFn } from "@yoopta/image";
 import Table from "@yoopta/table";
 import { Bold, Italic, Underline, Strike, CodeMark } from "@yoopta/marks";
-import type { SlateElement, YooptaPlugin } from "@yoopta/editor";
+import { YooptaPlugin, type SlateElement } from "@yoopta/editor";
 import { uploadBlockImage } from "@/lib/uploads";
 
 // El plugin llama upload(file, onProgress) del lado del cliente; onProgress
@@ -20,8 +20,22 @@ const handleImageUpload: ImageUploadFn = async (file) => {
   return { id: null, src, alt };
 };
 
+// @yoopta/table (6.0.5) intenta crear un bloque de respaldo usando el tipo
+// de elemento Slate "paragraph" (minúscula) en vez del tipo de bloque
+// "Paragraph" (mayúscula) que usa el resto de Yoopta para registrar
+// plugins — sin este alias, insertar una tabla tira "Plugin paragraph not
+// found" y no inserta nada (confirmado con Playwright). Es un bug de la
+// librería en su versión actual, no algo particular de este código: se
+// registra un segundo plugin con el mismo comportamiento que Paragraph,
+// solo bajo esa otra clave, para que ese lookup interno encuentre algo.
+const ParagraphLowercaseAlias = new YooptaPlugin({
+  ...Paragraph.getPlugin,
+  type: "paragraph",
+});
+
 export const plugins: YooptaPlugin<Record<string, SlateElement>>[] = [
   Paragraph,
+  ParagraphLowercaseAlias as unknown as YooptaPlugin<Record<string, SlateElement>>,
   HeadingOne,
   HeadingTwo,
   HeadingThree,

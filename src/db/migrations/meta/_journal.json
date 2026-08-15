@@ -64,6 +64,13 @@
       "when": 1786755496613,
       "tag": "0008_fixed_the_watchers",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786759802822,
+      "tag": "0009_chief_lord_tyger",
+      "breakpoints": true
     }
   ]
 }

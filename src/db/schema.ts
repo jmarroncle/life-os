@@ -319,6 +319,10 @@ export const databaseRows = lifeOs.table(
     // columna: text/url/select -> string, number -> number, multi_select ->
     // string[], date -> string "YYYY-MM-DD", checkbox -> boolean.
     values: jsonb("values").notNull().default({}),
+    // Igual que pages/notes: bloques de Yoopta. En Notion cada fila de una
+    // base de datos es también una página completa (texto, tablas,
+    // imágenes) — esto es lo mismo acá, aparte de sus valores de columna.
+    content: jsonb("content").notNull().default({}),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

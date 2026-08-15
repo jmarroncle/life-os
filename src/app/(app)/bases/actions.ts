@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { logUndo, omitId, type InverseOp } from "@/lib/undo";
+import type { YooptaContentValue } from "@/components/block-editor";
 
 export type DatabaseColumnType = (typeof databaseColumnType.enumValues)[number];
 
@@ -93,6 +94,54 @@ export async function getDatabaseView(id: string) {
     .orderBy(asc(databaseRows.position), asc(databaseRows.createdAt));
 
   return { database, columns, rows };
+}
+
+// Para /bases/[id]/filas/[rowId]: en Notion cada fila de una base de datos
+// es también una página completa. Trae la fila + la base + las columnas
+// (para el breadcrumb y el label de la fila, ver rowLabel).
+export async function getRowView(rowId: string) {
+  const user = await requireUser();
+
+  const [row] = await db
+    .select()
+    .from(databaseRows)
+    .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, user.id)))
+    .limit(1);
+  if (!row) return null;
+
+  const [database] = await db
+    .select()
+    .from(databases)
+    .where(eq(databases.id, row.databaseId))
+    .limit(1);
+  if (!database) return null;
+
+  const columns = await db
+    .select()
+    .from(databaseColumns)
+    .where(eq(databaseColumns.databaseId, row.databaseId))
+    .orderBy(asc(databaseColumns.position), asc(databaseColumns.createdAt));
+
+  return { row, database, columns };
+}
+
+export async function updateRowContent(rowId: string, content: YooptaContentValue) {
+  const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(databaseRows)
+    .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
+  await db
+    .update(databaseRows)
+    .set({ content, updatedAt: new Date() })
+    .where(and(eq(databaseRows.id, rowId), eq(databaseRows.userId, user.id)));
+
+  await logUndo(user.id, "Editar contenido de fila", [
+    { op: "update", table: "databaseRows", id: rowId, values: omitId(before) },
+  ]);
 }
 
 export async function addColumn(databaseId: string, formData: FormData) {

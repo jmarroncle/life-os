@@ -79,6 +79,7 @@ export default async function BaseDetailPage({
       </h1>
 
       <DatabaseTable
+        databaseId={id}
         columns={columns}
         rows={rows}
         onUpdateRow={boundUpdateRow}

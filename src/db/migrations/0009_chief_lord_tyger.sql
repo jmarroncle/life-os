@@ -1,0 +1,1 @@
+ALTER TABLE "life_os"."database_rows" ADD COLUMN "content" jsonb DEFAULT '{}'::jsonb NOT NULL;

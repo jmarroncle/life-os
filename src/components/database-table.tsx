@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import type { DatabaseColumnType } from "@/app/(app)/bases/actions";
+import { rowLabel } from "@/lib/database-row-label";
 
 export type DatabaseColumnView = {
   id: string;
@@ -113,6 +115,7 @@ function CellInput({
 }
 
 export function DatabaseTable({
+  databaseId,
   columns,
   rows,
   onUpdateRow,
@@ -120,6 +123,7 @@ export function DatabaseTable({
   onDeleteColumn,
   onAddRow,
 }: {
+  databaseId: string;
   columns: DatabaseColumnView[];
   rows: DatabaseRowView[];
   onUpdateRow: (rowId: string, formData: FormData) => Promise<void>;
@@ -135,15 +139,16 @@ export function DatabaseTable({
     );
   }
 
-  const gridTemplate = `repeat(${columns.length}, minmax(9rem, 1fr)) 5rem`;
+  const gridTemplate = `2.5rem repeat(${columns.length}, minmax(9rem, 1fr)) 5rem`;
 
   return (
     <div className="overflow-x-auto rounded-md border border-neutral-200">
-      <div style={{ minWidth: `${columns.length * 9 + 5}rem` }}>
+      <div style={{ minWidth: `${columns.length * 9 + 7.5}rem` }}>
         <div
           className="grid border-b border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-500"
           style={{ gridTemplateColumns: gridTemplate }}
         >
+          <div className="px-2 py-2" />
           {columns.map((column) => (
             <div
               key={column.id}
@@ -176,6 +181,15 @@ export function DatabaseTable({
               className="grid items-center border-b border-neutral-100 text-sm last:border-b-0"
               style={{ gridTemplateColumns: gridTemplate }}
             >
+              <div className="flex items-center justify-center px-1 py-1">
+                <Link
+                  href={`/bases/${databaseId}/filas/${row.id}`}
+                  title={`Abrir "${rowLabel(row.values, columns)}" como página`}
+                  className="text-neutral-400 hover:text-neutral-900"
+                >
+                  📄
+                </Link>
+              </div>
               {columns.map((column) => (
                 <div key={column.id} className="px-1 py-1">
                   <CellInput column={column} value={row.values[column.id]} />
@@ -207,6 +221,7 @@ export function DatabaseTable({
           className="grid items-center border-t border-neutral-200 bg-neutral-50 text-sm"
           style={{ gridTemplateColumns: gridTemplate }}
         >
+          <div className="px-1 py-1" />
           {columns.map((column) => (
             <div key={column.id} className="px-1 py-1">
               <CellInput column={column} value={undefined} />
