@@ -102,6 +102,28 @@ body {
   padding-left: 1.5rem;
   list-style: decimal;
 }
+/*
+ * El toolbar flotante por bloque ("+"/arrastrar/"⋯", ver
+ * block-editor-block-actions.tsx) se posiciona con left = borde
+ * izquierdo del bloque + un translateX(-10px) — es decir, se espera que
+ * quede la mayor parte DENTRO del ancho del bloque (~74px, confirmado
+ * midiendo con Playwright: el bloque en sí no reserva ese hueco, así que
+ * tapaba las primeras palabras del texto). El fix real es correrle el
+ * contenido editable (no el bloque, que es el ancla del toolbar) hacia la
+ * derecha con padding — así el toolbar cae sobre ese margen vacío en vez
+ * de sobre texto real. Se apunta al hijo directo `.yoopta-slate` de cada
+ * bloque de nivel superior (child combinator) para no correr también el
+ * contenido de sub-editores anidados (celdas de tabla, etc.). Además se
+ * scopea a que el bloque esté dentro de `.yoopta-ui-block-dnd-sortable`
+ * (el wrapper que SortableBlock agrega solo cuando el toolbar hover está
+ * habilitado — ver perBlockHoverUiEnabled en block-editor.tsx), para no
+ * correr también el texto en vistas de solo lectura o en el layout de
+ * columnas, donde el toolbar nunca aparece y el padding no tendría
+ * motivo.
+ */
+.yoopta-editor-life-os .yoopta-ui-block-dnd-sortable .yoopta-block > .yoopta-slate {
+  padding-left: 4.75rem;
+}
 .yoopta-editor-life-os [data-element-type="link"] {
   color: var(--color-blue-600);
   text-decoration: underline;
