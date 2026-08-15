@@ -61,3 +61,51 @@ body {
   background: var(--color-neutral-50);
   color: var(--color-neutral-900);
 }
+
+/*
+ * Tipografía del contenido del editor de bloques (Yoopta). El reset de
+ * Tailwind saca el tamaño/peso nativo de los h1-h6, y Yoopta no aplica el
+ * suyo propio — sin esto, HeadingOne/Two/Three se ven idénticos a un
+ * párrafo. Selecciona por [data-element-type] en vez de por tag: algunos
+ * bloques (Paragraph, HeadingOne) renderizan como <p>, no como <h1> real.
+ */
+.yoopta-editor-life-os [data-element-type="heading-one"] {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.25rem;
+}
+.yoopta-editor-life-os [data-element-type="heading-two"] {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 1rem;
+}
+.yoopta-editor-life-os [data-element-type="heading-three"] {
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.75rem;
+}
+.yoopta-editor-life-os [data-element-type="blockquote"] {
+  border-left: 3px solid var(--color-neutral-300);
+  padding-left: 0.75rem;
+  color: var(--color-neutral-600);
+  font-style: italic;
+}
+.yoopta-editor-life-os [data-element-type="bulleted-list"] {
+  padding-left: 1.5rem;
+  list-style: disc;
+}
+.yoopta-editor-life-os [data-element-type="numbered-list"] {
+  padding-left: 1.5rem;
+  list-style: decimal;
+}
+.yoopta-editor-life-os [data-element-type="link"] {
+  color: var(--color-blue-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.yoopta-editor-life-os [data-element-type="link"]:hover {
+  color: var(--color-blue-300);
+}
