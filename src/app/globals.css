@@ -109,6 +109,21 @@ body {
 .yoopta-editor-life-os [data-element-type="link"]:hover {
   color: var(--color-blue-300);
 }
+.yoopta-editor-life-os table[data-element-type="table"] {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+.yoopta-editor-life-os [data-element-type="table-data-cell"] {
+  border: 1px solid var(--color-neutral-200);
+  padding: 0.4rem 0.6rem;
+  min-width: 6rem;
+  vertical-align: top;
+}
+.yoopta-editor-life-os tr[data-element-type="table-row"]:first-child [data-element-type="table-data-cell"] {
+  background: var(--color-neutral-50);
+  font-weight: 600;
+}
 
 /*
  * Layout de columnas por página (ver pages.layout en el schema, y el

@@ -82,12 +82,21 @@ export function BlockEditorSlashMenu() {
       group: "Otro",
       onSelect: () => editor.toggleBlock("Divider", { focus: true }),
     },
+    // El setTimeout(…, 0) en Imagen y Tabla no es cosmético: llamar a
+    // insertImage/insertTable en el mismo tick que el menú "/" borra el "/"
+    // tipeado hace que el bloque recién insertado se pise con una
+    // normalización de Slate que todavía no conoce sus tipos de elemento
+    // (table/table-row/table-data-cell, etc.) y lo aplana a un párrafo
+    // vacío — confirmado bloque por bloque con Playwright: el bloque nace
+    // con el tipo correcto y termina reemplazado dos renders después.
+    // Diferir la llamada un tick deja terminar esa limpieza primero.
     {
       id: "image",
       title: "Imagen",
       description: "Subir una imagen",
       group: "Multimedia",
-      onSelect: () => ImageCommands.insertImage(editor, { focus: true }),
+      onSelect: () =>
+        setTimeout(() => ImageCommands.insertImage(editor, { focus: true }), 0),
     },
     {
       id: "table",
@@ -95,11 +104,15 @@ export function BlockEditorSlashMenu() {
       description: "Tabla de 3×3",
       group: "Multimedia",
       onSelect: () =>
-        TableCommands.insertTable(editor, {
-          rows: 3,
-          columns: 3,
-          headerRow: true,
-        }),
+        setTimeout(
+          () =>
+            TableCommands.insertTable(editor, {
+              rows: 3,
+              columns: 3,
+              headerRow: true,
+            }),
+          0,
+        ),
     },
   ];
 
