@@ -1,6 +1,7 @@
 "use server";
 
 import { and, eq, inArray } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { databaseColumns, databaseRows, databases, pages } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -91,12 +92,19 @@ export async function listDraftItems(): Promise<DraftItem[]> {
   );
 }
 
+// listDraftItems() se lee desde tres lugares (la página /revisar, el badge
+// del tab en el layout de Data Center, y el widget "Por revisar" de
+// Inicio) — sin revalidar, el refresh automático de la Server Action solo
+// alcanza a esta página y esos otros dos quedaban con el conteo viejo
+// hasta la próxima navegación completa.
 export async function markPageReviewed(id: string) {
   const user = await requireUser();
   await db
     .update(pages)
     .set({ reviewStatus: "reviewed" })
     .where(and(eq(pages.id, id), eq(pages.userId, user.id)));
+  revalidatePath("/data-center", "layout");
+  revalidatePath("/");
 }
 
 export async function markRowReviewed(id: string) {
@@ -105,4 +113,6 @@ export async function markRowReviewed(id: string) {
     .update(databaseRows)
     .set({ reviewStatus: "reviewed" })
     .where(and(eq(databaseRows.id, id), eq(databaseRows.userId, user.id)));
+  revalidatePath("/data-center", "layout");
+  revalidatePath("/");
 }
