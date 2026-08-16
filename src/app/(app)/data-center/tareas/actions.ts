@@ -2,11 +2,12 @@
 
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { projects, tasks, taskStatus } from "@/db/schema";
+import { projects, tasks, taskPriority, taskStatus } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { logUndo, omitId } from "@/lib/undo";
 
 export type TaskStatus = (typeof taskStatus.enumValues)[number];
+export type TaskPriority = (typeof taskPriority.enumValues)[number];
 
 export async function listProjects() {
   const user = await requireUser();
@@ -125,6 +126,8 @@ export async function getTask(id: string) {
       title: tasks.title,
       description: tasks.description,
       status: tasks.status,
+      priority: tasks.priority,
+      assignees: tasks.assignees,
       dueDate: tasks.dueDate,
       projectId: tasks.projectId,
       prUrl: tasks.prUrl,
@@ -141,6 +144,8 @@ export async function updateTask(
     title?: string;
     description?: string | null;
     status?: TaskStatus;
+    priority?: TaskPriority | null;
+    assignees?: string | null;
     dueDate?: Date | null;
     projectId?: string | null;
   },

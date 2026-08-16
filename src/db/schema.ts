@@ -30,6 +30,12 @@ export const taskStatus = lifeOs.enum("task_status", [
   "done",
 ]);
 
+export const taskPriority = lifeOs.enum("task_priority", [
+  "low",
+  "medium",
+  "high",
+]);
+
 export const projects = lifeOs.table(
   "projects",
   {
@@ -60,6 +66,11 @@ export const tasks = lifeOs.table(
     title: text("title").notNull(),
     description: text("description"),
     status: taskStatus("status").notNull().default("todo"),
+    // Texto libre, no una referencia a cuentas de usuario — es una app de
+    // un solo usuario, esto es solo descriptivo (viene de tareas
+    // importadas de un workspace de equipo en Notion).
+    priority: taskPriority("priority"),
+    assignees: text("assignees"),
     dueDate: timestamp("due_date", { withTimezone: true }),
     position: integer("position").notNull().default(0),
     prUrl: text("pr_url"),
