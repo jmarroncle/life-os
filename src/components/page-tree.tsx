@@ -230,14 +230,14 @@ function PageNode({
         <form
           action={createPage.bind(null, node.id)}
           style={{ paddingLeft: (depth + 1) * 16 }}
-          className="flex gap-1 py-1 pr-1"
+          className="flex flex-wrap gap-1 py-1 pr-1"
         >
           <input
             autoFocus
             type="text"
             name="title"
             placeholder="Título de la subpágina…"
-            className="flex-1 rounded border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
+            className="min-w-0 flex-1 rounded border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
           />
           <button
             type="submit"
