@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   deleteTask,
   updateTaskStatus,
@@ -76,10 +77,15 @@ export function TaskBoard({ initialTasks }: { initialTasks: Task[] }) {
                   className="rounded-md border border-neutral-200 bg-white p-3 text-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span>{task.title}</span>
+                    <Link
+                      href={`/data-center/tareas/${task.id}`}
+                      className="min-w-0 flex-1 hover:underline"
+                    >
+                      {task.title}
+                    </Link>
                     <button
                       onClick={() => handleDelete(task.id)}
-                      className="text-neutral-300 hover:text-red-500"
+                      className="shrink-0 text-neutral-300 hover:text-red-500"
                       aria-label="Eliminar tarea"
                     >
                       ×

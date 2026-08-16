@@ -117,6 +117,52 @@ export async function updateTaskStatus(id: string, status: TaskStatus) {
   ]);
 }
 
+export async function getTask(id: string) {
+  const user = await requireUser();
+  const [row] = await db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      status: tasks.status,
+      dueDate: tasks.dueDate,
+      projectId: tasks.projectId,
+      prUrl: tasks.prUrl,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function updateTask(
+  id: string,
+  patch: {
+    title?: string;
+    description?: string | null;
+    status?: TaskStatus;
+    dueDate?: Date | null;
+    projectId?: string | null;
+  },
+) {
+  const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
+  await db
+    .update(tasks)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)));
+
+  await logUndo(user.id, `Editar tarea "${before.title}"`, [
+    { op: "update", table: "tasks", id, values: omitId(before) },
+  ]);
+}
+
 export async function deleteTask(id: string) {
   const user = await requireUser();
   const [before] = await db
