@@ -364,6 +364,34 @@ export const databaseRows = lifeOs.table(
   ],
 );
 
+// Vista guardada de una base de datos: filtros + orden + columnas
+// ocultas, todo aplicado del lado del cliente (las filas ya viajan
+// completas a DatabaseTable) — esta tabla solo guarda el PRESET con
+// nombre para poder volver a aplicarlo con un click, no una copia de los
+// datos filtrados.
+export const databaseViews = lifeOs.table(
+  "database_views",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    databaseId: uuid("database_id")
+      .notNull()
+      .references(() => databases.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // [{ columnId, op, value }] — ver FilterOp en database-table.tsx.
+    filters: jsonb("filters").notNull().default([]),
+    sortColumnId: uuid("sort_column_id"),
+    sortDirection: text("sort_direction"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("database_views_database_id_idx").on(table.databaseId)],
+);
+
 // --- Vínculo página <-> base de datos ---
 // Una página puede "embeber" bases de datos existentes (ej. la página
 // "Marketing y ventas" mostrando la base "Suite de productos" como una

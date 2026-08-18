@@ -7,6 +7,7 @@ import {
   databaseColumns,
   databaseRows,
   databases,
+  databaseViews,
   type databaseColumnType,
 } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -14,6 +15,8 @@ import { logUndo, omitId, type InverseOp } from "@/lib/undo";
 import type { YooptaContentValue } from "@/components/block-editor";
 
 export type DatabaseColumnType = (typeof databaseColumnType.enumValues)[number];
+
+export type DatabaseFilter = { columnId: string; op: string; value: string };
 
 export async function listDatabases() {
   const user = await requireUser();
@@ -93,7 +96,67 @@ export async function getDatabaseView(id: string) {
     .where(eq(databaseRows.databaseId, id))
     .orderBy(asc(databaseRows.position), asc(databaseRows.createdAt));
 
-  return { database, columns, rows };
+  const views = await db
+    .select()
+    .from(databaseViews)
+    .where(eq(databaseViews.databaseId, id))
+    .orderBy(asc(databaseViews.position), asc(databaseViews.createdAt));
+
+  return { database, columns, rows, views };
+}
+
+export async function createView(
+  databaseId: string,
+  input: {
+    name: string;
+    filters: DatabaseFilter[];
+    sortColumnId: string | null;
+    sortDirection: string | null;
+  },
+) {
+  const user = await requireUser();
+  const name = input.name.trim();
+  if (!name) return;
+
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(databaseViews)
+    .where(eq(databaseViews.databaseId, databaseId));
+
+  const [created] = await db
+    .insert(databaseViews)
+    .values({
+      databaseId,
+      userId: user.id,
+      name,
+      filters: input.filters,
+      sortColumnId: input.sortColumnId,
+      sortDirection: input.sortDirection,
+      position: count,
+    })
+    .returning({ id: databaseViews.id });
+
+  await logUndo(user.id, `Crear vista "${name}"`, [
+    { op: "delete", table: "databaseViews", id: created.id },
+  ]);
+}
+
+export async function deleteView(viewId: string) {
+  const user = await requireUser();
+  const [before] = await db
+    .select()
+    .from(databaseViews)
+    .where(and(eq(databaseViews.id, viewId), eq(databaseViews.userId, user.id)))
+    .limit(1);
+  if (!before) return;
+
+  await db
+    .delete(databaseViews)
+    .where(and(eq(databaseViews.id, viewId), eq(databaseViews.userId, user.id)));
+
+  await logUndo(user.id, `Eliminar vista "${before.name}"`, [
+    { op: "insert", table: "databaseViews", values: before },
+  ]);
 }
 
 // Para /bases/[id]/filas/[rowId]: en Notion cada fila de una base de datos

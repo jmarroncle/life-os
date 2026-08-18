@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import {
   addColumn,
   addRow,
+  createView,
   deleteColumn,
   deleteDatabase,
   deleteRow,
+  deleteView,
   getDatabaseView,
   updateRow,
+  type DatabaseFilter,
 } from "../actions";
 import { DatabaseTable } from "@/components/database-table";
 
@@ -31,7 +34,7 @@ export default async function BaseDetailPage({
     notFound();
   }
 
-  const { database, columns, rows: rawRows } = view;
+  const { database, columns, rows: rawRows, views } = view;
   const columnRefs = columns.map((column) => ({
     id: column.id,
     type: column.type,
@@ -49,6 +52,16 @@ export default async function BaseDetailPage({
   async function boundAddRow(formData: FormData) {
     "use server";
     await addRow(id, columnRefs, formData);
+  }
+
+  async function boundCreateView(input: {
+    name: string;
+    filters: DatabaseFilter[];
+    sortColumnId: string | null;
+    sortDirection: string | null;
+  }) {
+    "use server";
+    await createView(id, input);
   }
 
   return (
@@ -82,10 +95,13 @@ export default async function BaseDetailPage({
         databaseId={id}
         columns={columns}
         rows={rows}
+        views={views}
         onUpdateRow={boundUpdateRow}
         onDeleteRow={deleteRow}
         onDeleteColumn={deleteColumn}
         onAddRow={boundAddRow}
+        onCreateView={boundCreateView}
+        onDeleteView={deleteView}
       />
 
       <div className="space-y-2 border-t border-neutral-100 pt-4">

@@ -99,6 +99,13 @@
       "when": 1786924408654,
       "tag": "0013_hard_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787060942455,
+      "tag": "0014_clever_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

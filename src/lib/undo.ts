@@ -7,6 +7,7 @@ import {
   databaseColumns,
   databaseRows,
   databases,
+  databaseViews,
   notes,
   pageDatabaseLinks,
   pages,
@@ -32,6 +33,7 @@ const TABLES = {
   databases,
   databaseColumns,
   databaseRows,
+  databaseViews,
   pageDatabaseLinks,
 } as const;
 
