@@ -154,16 +154,20 @@ nuevo.
 
 ## Base de datos
 
-Las tablas (`life_os.projects`, `tasks`, `pages`, `notes`, `accounts`,
-`categories`, `transactions`, `budgets`, `google_calendar_connections`)
-todavía no están creadas en Supabase — el schema vive en `src/db/schema.ts`
-pero falta aplicarlo. Dos formas de hacerlo:
+Las 17 tablas de Life OS (`life_os.projects`, `tasks`, `pages`, `notes`,
+`accounts`, `categories`, `transactions`, `budgets`, `databases`,
+`database_columns`, `database_rows`, `database_views`,
+`page_database_links`, `undo_log`, `mcp_calls`,
+`google_calendar_connections`) viven en `src/db/schema.ts` — detalle de
+columnas, tipos y relaciones en
+[docs/reference/database-schema.md](docs/reference/database-schema.md).
+Si el proyecto de Supabase es nuevo, el schema todavía no está aplicado:
+dos formas de hacerlo:
 
-- **Rápido (una vez):** pegar el contenido de **las seis** migraciones, en
-  orden, en Supabase → SQL Editor → New query, y correrlas (los nombres de
-  archivo exactos están en `src/db/migrations/`, empiezan con `0000_`,
-  `0001_`, `0002_`, `0003_`, `0004_`, `0005_`). Mismo flujo que ya usás para
-  `behavioral-design-platform/supabase/schema.sql`.
+- **Rápido (una vez):** pegar el contenido de **todas** las migraciones,
+  en orden, en Supabase → SQL Editor → New query, y correrlas (los nombres
+  de archivo exactos y su orden están en `src/db/migrations/`). Mismo flujo
+  que ya usás para `behavioral-design-platform/supabase/schema.sql`.
 - **Con Drizzle (para cambios futuros de schema):** con `DATABASE_URL`
   cargado en `.env.local`, `npm run db:generate` genera la migración y
   `npm run db:migrate` la aplica.
@@ -229,9 +233,12 @@ claude mcp add --transport http life-os https://tu-dominio.vercel.app/api/mcp \
 **Qué puede hacer hoy:** listar/crear/actualizar/borrar tareas y
 proyectos, listar/crear/actualizar/borrar páginas y notas (contenido en
 texto plano — el editor de bloques con formato rico solo funciona desde
-la app), y leer/crear cuentas, categorías, movimientos y el resumen
-financiero del mes. Ver Notas técnicas para el detalle de por qué no
-soporta formato rico ni reportes todavía.
+la app), leer/crear cuentas, categorías, movimientos y el resumen
+financiero del mes, y leer/crear/actualizar/borrar bases de datos
+genéricas (columnas y filas de `/bases`). Ver Notas técnicas para el
+detalle de por qué no soporta formato rico ni reportes todavía, y
+[docs/reference/mcp-tools.md](docs/reference/mcp-tools.md) para las 26
+tools una por una (nombre, parámetros, si son de solo lectura).
 
 ## Deploy en Vercel
 
