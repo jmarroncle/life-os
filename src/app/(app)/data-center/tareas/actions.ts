@@ -2,9 +2,11 @@
 
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { projects, tasks, taskPriority, taskStatus } from "@/db/schema";
+import { projects, tasks, taskPriority, taskStatus, teamMembers } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { logUndo, omitId } from "@/lib/undo";
+import { sendEmail } from "@/lib/email";
+import { sendPushNotification, type PushSubscriptionJson } from "@/lib/push";
 
 export type TaskStatus = (typeof taskStatus.enumValues)[number];
 export type TaskPriority = (typeof taskPriority.enumValues)[number];
@@ -131,6 +133,8 @@ export async function getTask(id: string) {
       dueDate: tasks.dueDate,
       projectId: tasks.projectId,
       prUrl: tasks.prUrl,
+      derivedToMemberId: tasks.derivedToMemberId,
+      derivedAt: tasks.derivedAt,
     })
     .from(tasks)
     .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
@@ -184,4 +188,87 @@ export async function deleteTask(id: string) {
   await logUndo(user.id, `Eliminar tarea "${before.title}"`, [
     { op: "insert", table: "tasks", values: before },
   ]);
+}
+
+const PRIORITY_LABEL: Record<TaskPriority, string> = {
+  low: "Baja",
+  medium: "Media",
+  high: "Alta",
+};
+
+// El compañero no tiene cuenta en Life OS (ver data-center/equipo) — no
+// puede entrar a ver la tarea, así que el email/push le mandan todo el
+// contenido posta en vez de un link a la app.
+export async function deriveTask(
+  taskId: string,
+  memberId: string,
+): Promise<{ emailOk: boolean; emailError?: string; pushOk: boolean; pushSkipped: boolean }> {
+  const user = await requireUser();
+
+  const [task] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
+    .limit(1);
+  if (!task) throw new Error("No se encontró la tarea.");
+
+  const [member] = await db
+    .select()
+    .from(teamMembers)
+    .where(and(eq(teamMembers.id, memberId), eq(teamMembers.userId, user.id)))
+    .limit(1);
+  if (!member) throw new Error("No se encontró el compañero.");
+
+  const detailLines = [
+    task.priority ? `Prioridad: ${PRIORITY_LABEL[task.priority]}` : null,
+    task.dueDate ? `Vence: ${task.dueDate.toLocaleDateString("es-AR")}` : null,
+  ].filter(Boolean);
+
+  const html = `
+    <h2>${task.title}</h2>
+    ${detailLines.length > 0 ? `<p>${detailLines.join(" · ")}</p>` : ""}
+    ${task.description ? `<p>${task.description.replace(/\n/g, "<br>")}</p>` : "<p><em>Sin notas.</em></p>"}
+    <p style="color:#888;font-size:12px;">Tarea derivada desde Life OS.</p>
+  `;
+
+  const emailResult = await sendEmail({
+    to: member.email,
+    subject: `Tarea derivada: ${task.title}`,
+    html,
+  });
+
+  let pushOk = false;
+  const pushSkipped = !member.pushSubscription;
+  if (member.pushSubscription) {
+    const pushResult = await sendPushNotification(
+      member.pushSubscription as PushSubscriptionJson,
+      {
+        title: `Nueva tarea: ${task.title}`,
+        body: task.description?.slice(0, 140) ?? "",
+        url: process.env.NEXT_PUBLIC_SITE_URL ?? "/",
+      },
+    );
+    pushOk = pushResult.ok;
+    if (pushResult.expired) {
+      // La suscripción venció (el compañero desinstaló, borró datos del
+      // navegador, etc.) — se limpia para que la UI vuelva a mostrarlo
+      // como "pendiente de activar" en vez de fallar en silencio cada vez.
+      await db
+        .update(teamMembers)
+        .set({ pushSubscription: null, activatedAt: null })
+        .where(eq(teamMembers.id, member.id));
+    }
+  }
+
+  await db
+    .update(tasks)
+    .set({ derivedToMemberId: member.id, derivedAt: new Date() })
+    .where(eq(tasks.id, taskId));
+
+  return {
+    emailOk: emailResult.ok,
+    emailError: emailResult.error,
+    pushOk,
+    pushSkipped,
+  };
 }

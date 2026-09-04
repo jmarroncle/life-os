@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getTask, listProjects, updateTask, deleteTask } from "../actions";
+import { getTask, listProjects, updateTask, deleteTask, deriveTask } from "../actions";
+import { listTeamMembers } from "../../equipo/actions";
 import { TaskDetail } from "@/components/task-detail";
 
 export default async function TareaPage({
   params,
 }: PageProps<"/data-center/tareas/[id]">) {
   const { id } = await params;
-  const [task, projectsList] = await Promise.all([getTask(id), listProjects()]);
+  const [task, projectsList, teamMembersList] = await Promise.all([
+    getTask(id),
+    listProjects(),
+    listTeamMembers(),
+  ]);
 
   if (!task) {
     notFound();
@@ -16,6 +21,11 @@ export default async function TareaPage({
   async function boundUpdateTask(patch: Parameters<typeof updateTask>[1]) {
     "use server";
     await updateTask(id, patch);
+  }
+
+  async function boundDeriveTask(memberId: string) {
+    "use server";
+    return deriveTask(id, memberId);
   }
 
   async function boundDeleteTask() {
@@ -43,7 +53,13 @@ export default async function TareaPage({
         </form>
       </div>
 
-      <TaskDetail task={task} projects={projectsList} onUpdate={boundUpdateTask} />
+      <TaskDetail
+        task={task}
+        projects={projectsList}
+        teamMembers={teamMembersList}
+        onUpdate={boundUpdateTask}
+        onDerive={boundDeriveTask}
+      />
     </div>
   );
 }

@@ -74,6 +74,14 @@ export const tasks = lifeOs.table(
     dueDate: timestamp("due_date", { withTimezone: true }),
     position: integer("position").notNull().default(0),
     prUrl: text("pr_url"),
+    // A quién se le derivó esta tarea (email + push, ver teamMembers) y
+    // cuándo — set null en vez de cascade: si se borra el compañero, la
+    // tarea no debería desaparecer con él.
+    derivedToMemberId: uuid("derived_to_member_id").references(
+      (): AnyPgColumn => teamMembers.id,
+      { onDelete: "set null" },
+    ),
+    derivedAt: timestamp("derived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -84,6 +92,34 @@ export const tasks = lifeOs.table(
   (table) => [
     index("tasks_user_id_idx").on(table.userId),
     index("tasks_project_id_idx").on(table.projectId),
+  ],
+);
+
+// Compañeros de equipo a los que se les puede "derivar" una tarea — no
+// son cuentas de usuario de Life OS (la app sigue siendo de un solo
+// usuario, sin login para nadie más). Se activan con un link de un solo
+// uso (activationToken) que el dueño les manda por su cuenta: al abrirlo
+// suscriben su navegador a Web Push (pushSubscription) para poder
+// recibir notificaciones ahí y por email.
+export const teamMembers = lifeOs.table(
+  "team_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    activationToken: text("activation_token").notNull(),
+    pushSubscription: jsonb("push_subscription"),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("team_members_user_id_idx").on(table.userId),
+    uniqueIndex("team_members_activation_token_idx").on(table.activationToken),
   ],
 );
 

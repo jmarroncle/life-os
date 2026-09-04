@@ -11,8 +11,21 @@ import { NextResponse, type NextRequest } from "next/server";
 // adentro (necesita mandar a /login con un ?next= si no hay sesión, algo
 // que este middleware no puede armar bien). /.well-known/* son los
 // endpoints de metadata OAuth (RFC 8414/9728), también llamados
-// server-to-server.
-const PUBLIC_PATHS = ["/login", "/auth", "/api/mcp", "/.well-known"];
+// server-to-server. /activar y /api/team/activate los abre un compañero
+// de equipo sin cuenta en Life OS (ver data-center/equipo) — su
+// activationToken de un solo uso es la única autenticación ahí. /sw.js
+// tiene que poder servirse sin sesión porque el navegador del compañero
+// lo pide directo (un redirect a /login rompería el registro del service
+// worker).
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth",
+  "/api/mcp",
+  "/.well-known",
+  "/activar",
+  "/api/team/activate",
+  "/sw.js",
+];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

@@ -13,6 +13,7 @@ import {
   pages,
   projects,
   tasks,
+  teamMembers,
   transactions,
   undoLog,
 } from "@/db/schema";
@@ -35,6 +36,7 @@ const TABLES = {
   databaseRows,
   databaseViews,
   pageDatabaseLinks,
+  teamMembers,
 } as const;
 
 export type UndoTableName = keyof typeof TABLES;

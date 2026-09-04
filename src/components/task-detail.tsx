@@ -55,9 +55,25 @@ type Task = {
   dueDate: Date | null;
   projectId: string | null;
   prUrl: string | null;
+  derivedToMemberId: string | null;
+  derivedAt: Date | null;
 };
 
 type Project = { id: string; name: string };
+
+type TeamMember = {
+  id: string;
+  name: string;
+  email: string;
+  activatedAt: Date | null;
+};
+
+type DeriveResult = {
+  emailOk: boolean;
+  emailError?: string;
+  pushOk: boolean;
+  pushSkipped: boolean;
+};
 
 type UpdatePatch = {
   title?: string;
@@ -76,23 +92,43 @@ function toDateInputValue(date: Date | null): string {
 export function TaskDetail({
   task,
   projects,
+  teamMembers,
   onUpdate,
+  onDerive,
 }: {
   task: Task;
   projects: Project[];
+  teamMembers: TeamMember[];
   onUpdate: (patch: UpdatePatch) => Promise<void>;
+  onDerive: (memberId: string) => Promise<DeriveResult>;
 }) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [priority, setPriority] = useState(task.priority);
   const [assignees, setAssignees] = useState(task.assignees ?? "");
   const [description, setDescription] = useState(task.description ?? "");
+  const [deriveMemberId, setDeriveMemberId] = useState(teamMembers[0]?.id ?? "");
+  const [deriving, setDeriving] = useState(false);
+  const [deriveResult, setDeriveResult] = useState<DeriveResult | null>(null);
 
   const legacyMeta = useMemo(() => parseLegacyMeta(description), [description]);
+  const derivedToMember = teamMembers.find((m) => m.id === task.derivedToMemberId);
 
   async function save(patch: UpdatePatch) {
     setSaveStatus("saving");
     await onUpdate(patch);
     setSaveStatus("saved");
+  }
+
+  async function handleDerive() {
+    if (!deriveMemberId) return;
+    setDeriving(true);
+    setDeriveResult(null);
+    try {
+      const result = await onDerive(deriveMemberId);
+      setDeriveResult(result);
+    } finally {
+      setDeriving(false);
+    }
   }
 
   function extractFromNotes() {
@@ -195,6 +231,52 @@ export function TaskDetail({
         placeholder="Asignado a…"
         className="w-full rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500"
       />
+
+      {teamMembers.length > 0 && (
+        <div className="space-y-2 rounded-md border border-neutral-200 p-3">
+          <p className="text-xs font-medium text-neutral-500">
+            Derivar (email + push a un compañero)
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={deriveMemberId}
+              onChange={(event) => setDeriveMemberId(event.target.value)}
+              className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            >
+              {teamMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                  {!member.activatedAt ? " (sin notificaciones activadas)" : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleDerive}
+              disabled={deriving}
+              className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {deriving ? "Derivando…" : "Derivar"}
+            </button>
+          </div>
+          {deriveResult && (
+            <p className="text-xs text-neutral-500">
+              {deriveResult.emailOk ? "Email enviado. " : `Email falló${deriveResult.emailError ? ` (${deriveResult.emailError})` : ""}. `}
+              {deriveResult.pushSkipped
+                ? "Sin push (no activó notificaciones todavía)."
+                : deriveResult.pushOk
+                  ? "Push enviado."
+                  : "Push falló."}
+            </p>
+          )}
+          {derivedToMember && task.derivedAt && (
+            <p className="text-xs text-neutral-400">
+              Derivada a {derivedToMember.name} el{" "}
+              {task.derivedAt.toLocaleDateString("es-AR")}.
+            </p>
+          )}
+        </div>
+      )}
 
       {legacyMeta && (
         <button
